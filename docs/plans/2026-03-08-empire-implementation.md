@@ -78,23 +78,23 @@ Create `core/constants.py`:
 
 ```python
 VAULT_MAX_LINES = 50
-PRESSURE_THRESHOLD_AUTO = 0.7
-PRESSURE_THRESHOLD_WARN = 0.5
 VAULT_PROMOTION_SESSIONS = 3
 DEVIANT_NUDGE_SESSIONS = 5
 DEVIANT_RESOLVE_SESSIONS = 10
 DUSK_LAYER1_MAX = 100
 DUSK_LAYER2_MAX = 50
 DUSK_LAYER3_MAX = 30
-DAY_MAX_SIZE_LINES = 200
 
-PRESSURE_WEIGHTS = {
-    "day_size": 0.3,
-    "staleness": 0.25,
-    "topic_drift": 0.2,
-    "decision_count": 0.15,
-    "git_boundary": 0.1,
-}
+# Simple succession triggers (no weighted formula — transparent and debuggable)
+DAY_ENTRY_LIMIT = 30           # Suggest succession when Day exceeds this
+SESSIONS_BEFORE_SUCCESSION = 5  # Suggest succession after this many sessions
+STALE_RATIO_THRESHOLD = 0.6    # Suggest succession when 60%+ entries have ref score 0
+
+# Reference tracking tiers
+REF_TIER1_SCORE = 2   # Exact file path match
+REF_TIER2_SCORE = 1   # Directory overlap
+REF_TIER3_SCORE = 1   # 2+ keyword matches (single keyword ignored — too noisy)
+REF_TIER3_MIN_KEYWORDS = 2  # Minimum keyword overlaps for tier 3
 
 EPITHET_KEYWORDS = {
     "the Builder": ["feature", "add", "create", "new", "implement", "build"],
@@ -522,7 +522,7 @@ from core.state import (
     read_file_safe,
     write_file_safe,
     count_lines,
-    calculate_pressure,
+    check_succession_triggers,
 )
 
 
@@ -566,15 +566,31 @@ def test_count_lines():
     assert count_lines("single") == 1
 
 
-def test_calculate_pressure_empty():
-    pressure = calculate_pressure(day_content="", day_max=200, stale_ratio=0.0, decision_count=0, git_boundary=False)
-    assert pressure == 0.0
+def test_succession_triggers_no_entries():
+    should, reason = check_succession_triggers(entries=[], sessions_since_last=0)
+    assert should is False
 
 
-def test_calculate_pressure_full_day():
-    big_day = "\n".join([f"line {i}" for i in range(200)])
-    pressure = calculate_pressure(day_content=big_day, day_max=200, stale_ratio=0.5, decision_count=10, git_boundary=True)
-    assert pressure > 0.7
+def test_succession_triggers_too_many_entries():
+    entries = [{"ref": 1, "title": f"entry {i}"} for i in range(35)]
+    should, reason = check_succession_triggers(entries=entries, sessions_since_last=1)
+    assert should is True
+    assert ">30 entries" in reason
+
+
+def test_succession_triggers_too_many_sessions():
+    entries = [{"ref": 1, "title": "entry"}]
+    should, reason = check_succession_triggers(entries=entries, sessions_since_last=6)
+    assert should is True
+    assert "sessions" in reason
+
+
+def test_succession_triggers_stale_entries():
+    entries = [{"ref": 0, "title": f"stale {i}"} for i in range(8)]
+    entries += [{"ref": 3, "title": "active 1"}, {"ref": 5, "title": "active 2"}]
+    should, reason = check_succession_triggers(entries=entries, sessions_since_last=1)
+    assert should is True
+    assert "stale" in reason.lower()
 ```
 
 **Step 11: Run tests to verify they fail**
@@ -593,7 +609,7 @@ Create `core/state.py`:
 import json
 import os
 from datetime import datetime, timezone
-from core.constants import PRESSURE_WEIGHTS, DAY_MAX_SIZE_LINES
+from core.constants import DAY_ENTRY_LIMIT, SESSIONS_BEFORE_SUCCESSION, STALE_RATIO_THRESHOLD
 
 
 def read_file_safe(path: str) -> str:
@@ -643,26 +659,30 @@ def write_dynasty_json(dynasty_dir: str, data: dict) -> None:
         json.dump(data, f, indent=2)
 
 
-def calculate_pressure(
-    day_content: str,
-    day_max: int = DAY_MAX_SIZE_LINES,
-    stale_ratio: float = 0.0,
-    decision_count: int = 0,
-    git_boundary: bool = False,
-    topic_drift: float = 0.0,
-) -> float:
-    day_lines = count_lines(day_content)
-    day_ratio = min(day_lines / max(day_max, 1), 1.0)
-    decision_ratio = min(decision_count / 20, 1.0)
+def check_succession_triggers(
+    entries: list[dict],
+    sessions_since_last: int,
+) -> tuple[bool, str | None]:
+    """Simple, transparent succession triggers. No weighted formula.
+    Returns (should_succeed, reason) where reason is human-readable."""
+    if not entries:
+        return False, None
 
-    pressure = (
-        day_ratio * PRESSURE_WEIGHTS["day_size"]
-        + stale_ratio * PRESSURE_WEIGHTS["staleness"]
-        + topic_drift * PRESSURE_WEIGHTS["topic_drift"]
-        + decision_ratio * PRESSURE_WEIGHTS["decision_count"]
-        + (1.0 if git_boundary else 0.0) * PRESSURE_WEIGHTS["git_boundary"]
-    )
-    return round(min(pressure, 1.0), 2)
+    # Trigger 1: Day has too many entries
+    if len(entries) > DAY_ENTRY_LIMIT:
+        return True, f"Day has >30 entries ({len(entries)})"
+
+    # Trigger 2: Too many sessions without succession
+    if sessions_since_last >= SESSIONS_BEFORE_SUCCESSION:
+        return True, f"{sessions_since_last} sessions since last succession"
+
+    # Trigger 3: Too many stale entries
+    stale = [e for e in entries if e.get("ref", 0) == 0]
+    stale_ratio = len(stale) / len(entries)
+    if stale_ratio >= STALE_RATIO_THRESHOLD:
+        return True, f"{int(stale_ratio * 100)}% of entries are stale ({len(stale)}/{len(entries)})"
+
+    return False, None
 ```
 
 **Step 13: Run tests to verify they pass**
@@ -899,7 +919,7 @@ Create `tests/test_ref_tracker.py`:
 ```python
 import json
 import pytest
-from core.ref_tracker import match_entries_to_content, load_ref_cache, save_ref_cache
+from core.ref_tracker import score_entries_against_content, load_ref_cache, save_ref_cache
 
 
 ENTRIES = [
@@ -908,19 +928,29 @@ ENTRIES = [
 ]
 
 
-def test_match_finds_title_keyword():
-    matches = match_entries_to_content(ENTRIES, "rate-limit.ts")
-    assert 0 in matches  # index of first entry
+def test_tier1_exact_file_path_match():
+    """Exact file path match = highest confidence (score 2)"""
+    scores = score_entries_against_content(ENTRIES, "middleware/rate-limit.ts")
+    assert scores[0] >= 2  # Tier 1 match on file path
 
 
-def test_match_finds_body_keyword():
-    matches = match_entries_to_content(ENTRIES, "session store")
-    assert 1 in matches
+def test_tier2_directory_overlap():
+    """Same directory = medium confidence (score 1)"""
+    scores = score_entries_against_content(ENTRIES, "middleware/cors.ts")
+    assert scores[0] >= 1  # Tier 2 match on directory
 
 
-def test_match_returns_empty_on_no_match():
-    matches = match_entries_to_content(ENTRIES, "completely unrelated content")
-    assert len(matches) == 0
+def test_tier3_needs_two_keyword_matches():
+    """Single keyword is ignored. Two+ keywords needed for tier 3."""
+    scores_single = score_entries_against_content(ENTRIES, "session")
+    scores_double = score_entries_against_content(ENTRIES, "session store")
+    assert scores_single.get(1, 0) == 0  # Single keyword — ignored
+    assert scores_double.get(1, 0) >= 1  # Two keywords — tier 3 match
+
+
+def test_no_match_returns_empty():
+    scores = score_entries_against_content(ENTRIES, "completely unrelated xyz")
+    assert all(v == 0 for v in scores.values())
 
 
 def test_ref_cache_roundtrip(tmp_path):
@@ -951,30 +981,61 @@ Create `core/ref_tracker.py`:
 ```python
 import json
 import os
+import re
+from core.constants import REF_TIER1_SCORE, REF_TIER2_SCORE, REF_TIER3_SCORE, REF_TIER3_MIN_KEYWORDS
 
 
-def match_entries_to_content(entries: list[dict], content: str) -> list[int]:
-    content_lower = content.lower()
-    matches = []
+def extract_file_paths(text: str) -> set[str]:
+    """Extract file paths from text (anything like path/to/file.ext)."""
+    return set(re.findall(r"[\w\-./\\]+\.\w+", text))
+
+
+def extract_directories(paths: set[str]) -> set[str]:
+    """Extract parent directories from file paths."""
+    return {os.path.dirname(p) for p in paths if os.path.dirname(p)}
+
+
+def extract_keywords(text: str) -> set[str]:
+    """Extract meaningful keywords (4+ chars, lowercase)."""
+    return {w.lower() for w in re.findall(r"\w+", text) if len(w) >= 4}
+
+
+def score_entries_against_content(entries: list[dict], content: str) -> dict[int, int]:
+    """Score each entry against tool content using tiered matching.
+    Returns {entry_index: score}. Higher score = more confident match.
+
+    Tier 1 (score 2): Exact file path match
+    Tier 2 (score 1): Directory overlap
+    Tier 3 (score 1): 2+ keyword matches (single keyword ignored — too noisy)
+    """
+    content_paths = extract_file_paths(content)
+    content_dirs = extract_directories(content_paths)
+    content_keywords = extract_keywords(content)
+    scores = {}
+
     for i, entry in enumerate(entries):
-        keywords = set()
-        for word in entry.get("title", "").split():
-            if len(word) > 3:
-                keywords.add(word.lower())
-        for word in entry.get("body", "").split():
-            if len(word) > 3:
-                keywords.add(word.lower())
-        # Also match on file paths (anything with a dot and slash)
-        import re
-        paths = re.findall(r"[\w\-./]+\.\w+", entry.get("body", ""))
-        for p in paths:
-            keywords.add(p.lower())
+        score = 0
+        entry_text = entry.get("title", "") + " " + entry.get("body", "")
+        entry_paths = extract_file_paths(entry_text)
+        entry_dirs = extract_directories(entry_paths)
+        entry_keywords = extract_keywords(entry_text)
 
-        for kw in keywords:
-            if kw in content_lower:
-                matches.append(i)
-                break
-    return matches
+        # Tier 1: Exact file path match
+        if entry_paths & content_paths:
+            score += REF_TIER1_SCORE
+
+        # Tier 2: Directory overlap
+        elif entry_dirs & content_dirs:
+            score += REF_TIER2_SCORE
+
+        # Tier 3: 2+ keyword matches
+        keyword_overlap = entry_keywords & content_keywords
+        if len(keyword_overlap) >= REF_TIER3_MIN_KEYWORDS:
+            score += REF_TIER3_SCORE
+
+        scores[i] = score
+
+    return scores
 
 
 def load_ref_cache(cache_path: str) -> dict:
@@ -1017,7 +1078,7 @@ sys.path.insert(0, plugin_root)
 from core.paths import get_project_root, get_dynasty_dir, get_current_branch
 from core.state import read_file_safe
 from core.entries import parse_day_entries
-from core.ref_tracker import match_entries_to_content, load_ref_cache, save_ref_cache
+from core.ref_tracker import score_entries_against_content, load_ref_cache, save_ref_cache
 
 
 def main():
@@ -1053,16 +1114,18 @@ def main():
         if not entries:
             return
 
-        matches = match_entries_to_content(entries, content)
-        if not matches:
+        # Tiered scoring: file path primary, keywords secondary
+        scores = score_entries_against_content(entries, content)
+        matched = {k: v for k, v in scores.items() if v > 0}
+        if not matched:
             return
 
         # Update ref cache (batched, applied at Stop)
         cache_path = os.path.join(dynasty_dir, "ref_cache.json")
         cache = load_ref_cache(cache_path)
-        for idx in matches:
+        for idx, score in matched.items():
             key = str(idx)
-            cache[key] = cache.get(key, 0) + 1
+            cache[key] = cache.get(key, 0) + score
         save_ref_cache(cache_path, cache)
 
     except Exception:
@@ -1122,23 +1185,23 @@ def test_generate_briefing_includes_summary():
         name="Claude VI",
         epithet="the Gatekeeper",
         branch="main",
-        pressure=0.42,
     )
     assert "Briefing" in briefing
     assert "Claude VI" in briefing
     assert "rate limiting" in briefing or "auth" in briefing
 
 
-def test_generate_briefing_includes_pressure():
+def test_generate_briefing_includes_succession_status():
     entries = parse_day_entries(SAMPLE_DAY)
     briefing = generate_briefing(
         entries=entries,
         name="Claude VI",
         epithet="the Gatekeeper",
         branch="main",
-        pressure=0.42,
+        succession_suggested=True,
+        succession_reason="Day has >30 entries (35)",
     )
-    assert "42%" in briefing
+    assert ">30 entries" in briefing
 
 
 def test_generate_briefing_includes_entry_count():
@@ -1148,7 +1211,6 @@ def test_generate_briefing_includes_entry_count():
         name="Claude VI",
         epithet="the Gatekeeper",
         branch="main",
-        pressure=0.42,
     )
     assert "3" in briefing
 
@@ -1159,7 +1221,6 @@ def test_generate_briefing_empty_entries():
         name="Claude I",
         epithet=None,
         branch="main",
-        pressure=0.0,
     )
     assert "Briefing" in briefing
     assert "0" in briefing
@@ -1186,7 +1247,8 @@ def generate_briefing(
     name: str,
     epithet: str | None,
     branch: str,
-    pressure: float,
+    succession_suggested: bool = False,
+    succession_reason: str | None = None,
 ) -> str:
     now = datetime.now(timezone.utc).isoformat()
     title = name
@@ -1209,7 +1271,11 @@ def generate_briefing(
         lines.append("No high-reference entries.")
 
     lines.append(f"{len(entries)} Day entries, {len(high_ref)} high-reference.")
-    lines.append(f"Succession pressure: {int(pressure * 100)}%")
+
+    if succession_suggested and succession_reason:
+        lines.append(f"⚔️ Succession suggested: {succession_reason}")
+    else:
+        lines.append("Succession: not needed.")
 
     return "\n".join(lines)
 ```
@@ -1243,12 +1309,11 @@ from core.state import (
     write_file_safe,
     read_dynasty_json,
     write_dynasty_json,
-    calculate_pressure,
+    check_succession_triggers,
 )
 from core.entries import parse_day_entries, serialize_day_entries
 from core.briefing import generate_briefing
 from core.ref_tracker import load_ref_cache
-from core.constants import PRESSURE_THRESHOLD_AUTO, PRESSURE_THRESHOLD_WARN
 
 
 def apply_ref_cache(entries: list[dict], cache: dict) -> list[dict]:
@@ -1296,15 +1361,9 @@ def main():
         updated_day = serialize_day_entries(entries, f"Claude {current}", current_epithet, branch, born)
         write_file_safe(day_path, updated_day)
 
-        # Calculate pressure
-        stale_entries = [e for e in entries if e.get("ref", 0) == 0]
-        stale_ratio = len(stale_entries) / max(len(entries), 1)
-
-        pressure = calculate_pressure(
-            day_content=updated_day,
-            stale_ratio=stale_ratio,
-            decision_count=len(entries),
-        )
+        # Check succession triggers (simple, transparent, no weighted formula)
+        sessions = dynasty.get("sessions_since_succession", 0)
+        should_succeed, reason = check_succession_triggers(entries, sessions)
 
         # Generate briefing
         briefing = generate_briefing(
@@ -1312,26 +1371,24 @@ def main():
             name=f"Claude {current}",
             epithet=current_epithet,
             branch=branch,
-            pressure=pressure,
+            succession_suggested=should_succeed,
+            succession_reason=reason,
         )
         briefing_path = os.path.join(dynasty_dir, "day-briefing.md")
         write_file_safe(briefing_path, briefing)
 
         # Update session count
-        dynasty["sessions_since_succession"] = dynasty.get("sessions_since_succession", 0) + 1
+        dynasty["sessions_since_succession"] = sessions + 1
         write_dynasty_json(dynasty_dir, dynasty)
 
-        # Pressure warnings
-        if pressure >= PRESSURE_THRESHOLD_AUTO:
-            # Write succession note to Dawn
+        # Succession suggestion (transparent reason)
+        if should_succeed:
             dawn_path = os.path.join(dynasty_dir, "dawn.md")
             dawn = read_file_safe(dawn_path)
-            if "succession required" not in dawn.lower():
-                dawn += "\n\n## ⚔️ Succession required\nPressure exceeded threshold. Run /empire succession or it will auto-trigger next session.\n"
+            if "succession suggested" not in dawn.lower():
+                dawn += f"\n\n## ⚔️ Succession suggested\nReason: {reason}\nRun /empire succession or it will auto-trigger next session.\n"
                 write_file_safe(dawn_path, dawn)
-            print(f"Empire: succession pressure critical ({int(pressure * 100)}%). Auto-succession recommended.")
-        elif pressure >= PRESSURE_THRESHOLD_WARN:
-            print(f"Empire: succession pressure rising ({int(pressure * 100)}%). Consider /empire succession soon.")
+            print(f"Empire: succession suggested — {reason}. Run /empire succession.")
 
     except Exception:
         pass  # Fail silently
@@ -1345,7 +1402,7 @@ if __name__ == "__main__":
 
 ```bash
 git add core/briefing.py hooks/stop.py tests/test_briefing.py
-git commit -m "feat: add Stop hook with briefing generation and pressure monitoring"
+git commit -m "feat: add Stop hook with briefing generation and succession triggers"
 ```
 
 ---
