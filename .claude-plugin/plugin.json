@@ -1,0 +1,10 @@
+{
+  "name": "empire",
+  "description": "Continuous Context Protocol — manage conversation context through dynasty succession (Dawn/Day/Dusk)",
+  "version": "0.1.0",
+  "author": {
+    "name": "jansimner"
+  },
+  "license": "MIT",
+  "keywords": ["context", "memory", "succession", "dynasty", "foundation"]
+}
