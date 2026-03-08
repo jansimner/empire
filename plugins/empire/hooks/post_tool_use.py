@@ -45,7 +45,7 @@ def main():
         if not entries:
             return
 
-        scores = score_entries_against_content(entries, content)
+        scores = score_entries_against_content(entries, content, project_root)
         matched = {k: v for k, v in scores.items() if v > 0}
         if not matched:
             return

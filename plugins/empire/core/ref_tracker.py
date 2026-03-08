@@ -7,14 +7,29 @@ from core.constants import REF_TIER1_SCORE, REF_TIER2_SCORE, REF_TIER3_SCORE, RE
 def extract_file_paths(text: str) -> set[str]:
     return set(re.findall(r"[\w\-./\\]+\.\w+", text))
 
+
+def normalize_paths(paths: set[str], project_root: str = "") -> set[str]:
+    """Normalize paths to relative form for consistent matching.
+
+    Strips project_root prefix and leading slashes so both
+    '/home/user/project/src/auth.ts' and 'src/auth.ts' become 'src/auth.ts'.
+    """
+    normalized = set()
+    for p in paths:
+        if project_root and p.startswith(project_root):
+            p = p[len(project_root):].lstrip("/\\")
+        normalized.add(p)
+    return normalized
+
+
 def extract_directories(paths: set[str]) -> set[str]:
     return {os.path.dirname(p) for p in paths if os.path.dirname(p)}
 
 def extract_keywords(text: str) -> set[str]:
     return {w.lower() for w in re.findall(r"\w+", text) if len(w) >= 4}
 
-def score_entries_against_content(entries: list[dict], content: str) -> dict[int, int]:
-    content_paths = extract_file_paths(content)
+def score_entries_against_content(entries: list[dict], content: str, project_root: str = "") -> dict[int, int]:
+    content_paths = normalize_paths(extract_file_paths(content), project_root)
     content_dirs = extract_directories(content_paths)
     content_keywords = extract_keywords(content)
     scores = {}
@@ -22,7 +37,7 @@ def score_entries_against_content(entries: list[dict], content: str) -> dict[int
     for i, entry in enumerate(entries):
         score = 0
         entry_text = entry.get("title", "") + " " + entry.get("body", "")
-        entry_paths = extract_file_paths(entry_text)
+        entry_paths = normalize_paths(extract_file_paths(entry_text), project_root)
         entry_dirs = extract_directories(entry_paths)
         entry_keywords = extract_keywords(entry_text)
 

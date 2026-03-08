@@ -27,6 +27,26 @@ def test_no_match_returns_empty():
     scores = score_entries_against_content(ENTRIES, "completely unrelated xyz")
     assert all(v == 0 for v in scores.values())
 
+def test_tier1_absolute_path_matches_relative():
+    """Absolute paths in tool content match relative paths in entries."""
+    scores = score_entries_against_content(
+        ENTRIES,
+        "/home/user/project/middleware/rate-limit.ts",
+        project_root="/home/user/project",
+    )
+    assert scores[0] >= 2  # tier-1 match after normalization
+
+
+def test_tier2_absolute_directory_matches_relative():
+    """Absolute directory paths match relative directories in entries."""
+    scores = score_entries_against_content(
+        ENTRIES,
+        "/home/user/project/middleware/cors.ts",
+        project_root="/home/user/project",
+    )
+    assert scores[0] >= 1  # tier-2 directory match
+
+
 def test_ref_cache_roundtrip(tmp_path):
     cache_path = str(tmp_path / "ref_cache.json")
     data = {"0": 3, "1": 1}
