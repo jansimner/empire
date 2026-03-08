@@ -22,7 +22,7 @@ Each dynasty member gets a regnal name (Claude I, Claude II, ...) and earns an e
 | Brother Day | Active context — driving current decisions |
 | Brother Dusk | Archived wisdom — distilled patterns and learnings |
 | Succession | Context rotation — triggered by pressure or events |
-| Dusk dies | Oldest wisdom pruned |
+| Dusk dies | Oldest wisdom demoted to lineage (never truly deleted) |
 | New Dawn born | Fresh context seeded from git state + past wisdom |
 
 ## Design Decisions
@@ -43,15 +43,67 @@ Each git branch gets its own dynasty with separate Dawn/Day/Dusk. Switching bran
 - Full Day/Dusk loaded on-demand only when needed
 - Day briefing is pre-computed at end of previous session (Stop hook) for accuracy
 
-### 4. Distillation (Tiered Automatic)
+### 4. Entry Types — Decisions vs Observations
 
-Reference scores track how often Day entries are used during work:
-- Score >= 3 → Dusk verbatim
-- Score 1-2 → Dusk compressed
-- Score 0 → pruned (archived in lineage)
-- Manual review available via `--review` flag
+Every Day entry is typed. This is the most critical design decision in Empire — it determines what can be safely compressed and what must be preserved verbatim.
 
-### 5. Vault Promotion (Hybrid with Cap, Quiet Overflow)
+**Decisions** have a `Why:` field that explains rationale. The `Why:` field is **sacred** — it NEVER gets compressed or summarized through any tier. This is a mechanical rule, not an AI judgment call.
+
+**Observations** are facts about what happened. They compress safely because the code still exists as source of truth.
+
+```markdown
+### [ref:5] [decision] Chose JWT RS256 over HS256
+Why: Auth service needs asymmetric verification across microservices.
+     HS256 requires shared secret which breaks zero-trust boundary.
+What: Implemented in auth.service.ts using jose library
+
+### [ref:2] [observation] Fixed rate limiter gap on health endpoint
+express-rate-limit middleware now applied globally before route matching.
+```
+
+Distillation behavior by type:
+
+| Type | Tier compression | Can be auto-pruned? |
+|---|---|---|
+| Decision | `What:` compresses, `Why:` survives verbatim through ALL tiers | Never. Demoted to lineage if ref 0, but `Why:` preserved |
+| Observation | Compresses normally through tiers | Yes, demoted to lineage by ref score |
+
+### 5. Distillation is Categorization, Not Summarization
+
+The succession agent's job is NOT to summarize entries. Summarization is a lossy telephone game — each pass degrades fidelity. Instead, the agent **categorizes**:
+
+1. Is this a decision with a "why"? → **Preserve the `Why:` verbatim.** Compress or drop the `What:`
+2. Is this a factual observation? → **Compress to one-liner.** Safe to lose detail
+3. Is this ephemeral work context? ("currently debugging X") → **Demote to lineage**
+
+Reference scores still drive promotion priority:
+- Score >= 3 → Dusk Layer 1 (verbatim for decisions, detailed for observations)
+- Score 1-2 → Dusk Layer 1 (decisions: `Why:` verbatim + compressed `What:`. Observations: one-liner)
+- Score 0 → Demoted to structured lineage (never auto-deleted)
+
+### 6. Nothing Auto-Deletes — Only Auto-Demotes
+
+**Context amnesia is impossible.** Nothing ever silently disappears from Empire.
+
+```
+Day entry, ref 0         → demoted to Dusk Layer 3 (not deleted)
+Dusk Layer 3, ref 0 x3   → demoted to Lineage (structured, searchable)
+Lineage                  → permanent, never auto-deleted
+```
+
+Lineage is not a flat log — it's a **structured searchable archive**. The AI can pull from lineage on-demand if it realizes it's missing context. Worst case is "I need to look it up", never "it's gone."
+
+### 7. Decrees — Permanent Dusk Entries
+
+Decisions that don't make the Vault cut but are too important to ever compress get marked as **Decrees**. Decrees are Dusk entries that:
+- Never compress through tiers
+- Never demote to lineage
+- Count against Dusk's size budget
+- Are immune to all automatic rotation
+
+Promotion path: Decision in Dusk → referenced in 2+ sessions → auto-promoted to Decree. Decrees can be further promoted to Vault manually.
+
+### 8. Vault Promotion (Hybrid with Cap, Quiet Overflow)
 
 - Dusk entries referenced across 3+ sessions → auto-promoted to Vault
 - Vault hard cap: 50 lines
@@ -59,7 +111,7 @@ Reference scores track how often Day entries are used during work:
 - `/empire vault` shows waiting candidates; user promotes at their own pace
 - Swap prompts only appear in `/empire succession --review` mode (the explicit "I want friction" path)
 
-### 6. Deviants (Manual + File-Path Conflicts, Advisory with Nudge)
+### 9. Deviants (Manual + File-Path Conflicts, Advisory with Nudge)
 
 - **v1 auto-detection limited to concrete conflicts only:** Vault references file X with pattern A, but file X was modified to use pattern B. Detectable via file path overlap without semantic understanding
 - **Manual flagging** for everything else — user knows when something contradicts
@@ -68,17 +120,17 @@ Reference scores track how often Day entries are used during work:
 - Nudge at 5 sessions unresolved, explicit resolution prompt at 10
 - Resolution options: fix, update, accept as known tech debt, dismiss
 
-### 7. Dawn Seeding (Git + Dusk Wisdom)
+### 10. Dawn Seeding (Git + Dusk Wisdom)
 
 New Dawn seeded from:
 - Git state: branch, recent commits, uncommitted changes, stash, TODOs/FIXMEs
 - Dusk wisdom: keyword-matched entries relevant to current branch/files
 
-### 8. Agent Teams (Citizens, Not Brothers)
+### 11. Agent Teams (Citizens, Not Brothers)
 
 Agents read Vault + Day briefing but don't participate in the dynasty. They report back to the main conversation, which decides what to record in Day. Simple, no merge logic.
 
-### 9. Configuration (Zero Config v1)
+### 12. Configuration (Zero Config v1)
 
 All thresholds hardcoded with sensible defaults. Config file exists with commented-out defaults for power users to hand-edit. `/empire config` command deferred to v2.
 
@@ -185,7 +237,7 @@ Fires after Read, Edit, Write, Grep, Glob tool calls (lightweight):
 
 **Why file paths are primary:** Day entries that mention specific files (e.g., "rate-limit.ts") can be reliably matched when those files are touched. Keyword matching ("auth") alone is too broad — requiring 2+ keyword matches reduces false positives while still catching relevant references.
 
-**Safety net:** If scoring is wrong, the consequence is suboptimal Dusk distillation, not data loss. Everything pruned goes to lineage and can be recovered via `/empire lineage --search`.
+**Safety net:** If scoring is wrong, the consequence is suboptimal Dusk placement, never data loss. Nothing is ever deleted — low-scoring entries are demoted to structured lineage and can be recovered via `/empire lineage --search`. Decisions are additionally protected: their `Why:` field survives all tiers regardless of ref score.
 
 ### Hook Principles
 
@@ -202,15 +254,17 @@ Triggered by: succession threshold met (auto-suggested, user confirms or auto-fi
 
 **Step 1: Freeze** — Snapshot current Day, Dusk, Dawn. Record trigger reason.
 
-**Step 2: Prune Dusk** — Check reference scores across last 3 successions. Score 0 across all → pruned. Remaining entries compress one tier:
-- Layer 1 (detailed, ~100 lines max) → Layer 2 (key decisions, ~50 lines max)
-- Layer 2 → Layer 3 (one-liners, ~30 lines max)
-- Layer 3 score 0 → pruned
+**Step 2: Compress Dusk** — Existing Dusk entries shift one tier down. Decrees and `[decision]` entries with `Why:` fields are exempt from compression — only the `What:` portion compresses:
+- Layer 1 (detailed) → Layer 2 (decisions: `Why:` preserved verbatim, `What:` compressed. Observations: one-liner)
+- Layer 2 → Layer 3 (decisions: `Why:` still verbatim. Observations: one-liner)
+- Layer 3 observations, ref 0 across 3 successions → demoted to structured lineage (never deleted)
+- Decrees: immune, stay in place
 
-**Step 3: Day → Dusk** — Succession agent spawned:
-- Score >= 3 → Dusk Layer 1 verbatim
-- Score 1-2 → Dusk Layer 1 compressed
-- Score 0 → pruned (archived in lineage)
+**Step 3: Day → Dusk** — Succession agent spawned. Agent **categorizes** (not summarizes):
+- For each Day entry, determine type: `[decision]` or `[observation]`
+- Decisions: `Why:` field preserved verbatim into Dusk. `What:` compressed based on ref score
+- Observations: compressed based on ref score (>= 3 detailed, 1-2 one-liner, 0 demoted to lineage)
+- Score 0 entries → demoted to structured lineage with full original text
 - Agent generates epithet from Day contents
 
 **Step 4: Dawn → Day** — Dawn contents become new Day. Scores reset. Dynasty counter increments.
@@ -233,10 +287,11 @@ Runs in a subagent to avoid polluting main conversation context.
 |---|---|---|
 | Vault | 50 lines (hard cap) | Always (SessionStart) |
 | Day briefing | ~30 lines | Always (SessionStart) |
-| Day (full) | Uncapped, pressure-monitored | On-demand |
-| Dusk | ~180 lines across 3 tiers | On-demand |
+| Day (full) | Uncapped, trigger-monitored | On-demand |
+| Dusk | ~180 lines across 3 tiers + decrees | On-demand |
+| Decrees | Part of Dusk budget, immune to compression | On-demand (with Dusk) |
 | Dawn | Lean, ~20-30 lines | During succession only |
-| Lineage | Append-only, unbounded | On-demand (`/empire lineage`) |
+| Lineage | Structured archive, append-only, unbounded | On-demand (`/empire lineage --search`) |
 | Deviants | Count in briefing | On-demand (`/empire deviant`) |
 
 **Permanent session overhead: ~80 lines.** Everything else loads only when needed.
@@ -270,7 +325,7 @@ Emoji-styled with box-drawing characters for all ceremony output.
 │  ⚔️  SUCCESSION OF CLAUDE VI "THE GATEKEEPER"       │
 │  🌿 Branch: main                                    │
 ├─────────────────────────────────────────────────────┤
-│  💀 Claude IV "the Architect"   Dusk → pruned        │
+│  💀 Claude IV "the Architect"   Dusk → lineage        │
 │  🌙 Claude V  "the Debugger"   Day  → Dusk          │
 │  ☀️  Claude VI "the Gatekeeper" Dawn → Day           │
 │  🌅 Claude VII                       → born as Dawn  │
@@ -308,7 +363,10 @@ Emoji-styled with box-drawing characters for all ceremony output.
 **Building:**
 - All 7 commands (empire, init, succession, vault, deviant, lineage, dawn)
 - 3 hooks (SessionStart, Stop, PostToolUse)
-- Succession agent
+- Succession agent with categorization-based distillation (not summarization)
+- Typed entries: `[decision]` (with sacred `Why:` field) vs `[observation]`
+- Decrees: permanent Dusk entries immune to compression
+- Demotion-only lifecycle: nothing auto-deletes, structured searchable lineage
 - Branch-linked dynasties
 - Reference tracking (file-path primary, keyword secondary with 2+ match threshold)
 - Simple succession triggers (entry count, session count, staleness ratio)
@@ -339,8 +397,17 @@ Emoji-styled with box-drawing characters for all ceremony output.
 
 ## Known Limitations & Risks
 
-### Reference Scoring (highest risk)
-PostToolUse keyword matching to infer whether a Day entry was "actively used" is imprecise. File path matching is reliable; keyword matching is noisy. The system is designed to be **safe when scoring is wrong** — pruned entries go to lineage and are recoverable. Distillation quality may be suboptimal but data is never truly lost. This is the area most likely to need iteration after real-world usage.
+### Reference Scoring (mitigated risk)
+PostToolUse keyword matching to infer whether a Day entry was "actively used" is imprecise. File path matching is reliable; keyword matching is noisy. Multiple safety nets ensure scoring errors are non-destructive:
+- **Nothing auto-deletes.** Low-scoring entries are demoted to structured lineage, never deleted
+- **Decisions are doubly protected.** The `Why:` field survives all tiers regardless of ref score
+- **Lineage is searchable.** If the AI realizes it's missing context, it can look it up
+- **Decrees escape scoring entirely.** Important decisions can be marked immune to all rotation
+
+Worst case with bad scoring: an entry ends up in lineage when it should have stayed in Dusk. The AI needs a lookup step to find it. This is "context with a lookup" not "context amnesia."
+
+### Distillation Quality (mitigated by categorization)
+Distillation is categorization (decision vs observation), not summarization. The agent never rewrites or paraphrases `Why:` fields — they're copied verbatim through all tiers. Observations compress safely because the code still exists. The "telephone game" problem is eliminated for decisions and acceptable for observations.
 
 ### Multi-Machine State
 Working state lives in `~/.claude/projects/` which doesn't sync across machines. If you work from multiple machines, each maintains an independent dynasty. v2 will offer optional committed state for portability.

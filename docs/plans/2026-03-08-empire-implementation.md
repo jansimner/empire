@@ -96,6 +96,10 @@ REF_TIER2_SCORE = 1   # Directory overlap
 REF_TIER3_SCORE = 1   # 2+ keyword matches (single keyword ignored — too noisy)
 REF_TIER3_MIN_KEYWORDS = 2  # Minimum keyword overlaps for tier 3
 
+# Entry types
+ENTRY_TYPE_DECISION = "decision"     # Has sacred Why: field, never compressed
+ENTRY_TYPE_OBSERVATION = "observation"  # Compresses safely through tiers
+
 EPITHET_KEYWORDS = {
     "the Builder": ["feature", "add", "create", "new", "implement", "build"],
     "the Gatekeeper": ["auth", "security", "permission", "token", "jwt", "csrf", "cors"],
@@ -271,46 +275,64 @@ SAMPLE_DAY = """# ☀️ Day — Claude III "the Builder"
 
 ## Entries
 
-### [ref:5] Added rate limiting
-Implemented express-rate-limit, 100 req/15min per IP.
+### [ref:5] [decision] Chose JWT RS256 over HS256
+Why: Auth service needs asymmetric verification across microservices.
+What: Implemented in auth.service.ts using jose library
 
-### [ref:0] Considered Redis
+### [ref:2] [observation] Fixed rate limiter gap on health endpoint
+express-rate-limit middleware now applied globally before route matching.
+
+### [ref:0] [observation] Considered Redis
 Decided against it.
 """
 
 SAMPLE_DUSK = """# 🌙 Dusk — Claude II "the Debugger"
 
 ## Layer 1 (detailed)
-### [ref:4] Payment race condition fix
-Mutex lock on concurrent checkout.
+### [ref:4] [decision] Payment mutex strategy
+Why: Concurrent checkout requests cause race conditions on inventory.
+What: Mutex lock in payment.service.ts:142
 
 ## Layer 2 (compressed)
-- [ref:2] Empty cart checkout returns 400
+- [ref:2] [observation] Empty cart checkout returns 400
+- [ref:2] [decision] Payment mutex — Why: concurrent checkout race conditions
 
 ## Layer 3 (one-liners)
-- [ref:1] Prisma needs $disconnect on error
+- [ref:1] [observation] Prisma needs $disconnect on error
 """
 
 
 def test_parse_day_entries_extracts_all():
     entries = parse_day_entries(SAMPLE_DAY)
-    assert len(entries) == 2
+    assert len(entries) == 3
 
 
 def test_parse_day_entries_extracts_ref_scores():
     entries = parse_day_entries(SAMPLE_DAY)
     assert entries[0]["ref"] == 5
-    assert entries[1]["ref"] == 0
+    assert entries[1]["ref"] == 2
+    assert entries[2]["ref"] == 0
+
+
+def test_parse_day_entries_extracts_type():
+    entries = parse_day_entries(SAMPLE_DAY)
+    assert entries[0]["type"] == "decision"
+    assert entries[1]["type"] == "observation"
 
 
 def test_parse_day_entries_extracts_title():
     entries = parse_day_entries(SAMPLE_DAY)
-    assert entries[0]["title"] == "Added rate limiting"
+    assert entries[0]["title"] == "Chose JWT RS256 over HS256"
+
+
+def test_parse_day_entries_extracts_why_field():
+    entries = parse_day_entries(SAMPLE_DAY)
+    assert "asymmetric verification" in entries[0]["why"]
 
 
 def test_parse_day_entries_extracts_body():
     entries = parse_day_entries(SAMPLE_DAY)
-    assert "express-rate-limit" in entries[0]["body"]
+    assert "auth.service.ts" in entries[0]["body"]
 
 
 def test_serialize_day_entries_roundtrips():
@@ -319,6 +341,8 @@ def test_serialize_day_entries_roundtrips():
     re_parsed = parse_day_entries(output)
     assert len(re_parsed) == len(entries)
     assert re_parsed[0]["ref"] == entries[0]["ref"]
+    assert re_parsed[0]["type"] == entries[0]["type"]
+    assert re_parsed[0]["why"] == entries[0]["why"]
 
 
 def test_parse_dusk_entries_extracts_layers():
@@ -327,8 +351,15 @@ def test_parse_dusk_entries_extracts_layers():
     layer2 = [e for e in entries if e["layer"] == 2]
     layer3 = [e for e in entries if e["layer"] == 3]
     assert len(layer1) == 1
-    assert len(layer2) == 1
+    assert len(layer2) == 2
     assert len(layer3) == 1
+
+
+def test_parse_dusk_decision_preserves_why():
+    entries = parse_dusk_entries(SAMPLE_DUSK)
+    decisions = [e for e in entries if e.get("type") == "decision"]
+    assert len(decisions) >= 1
+    assert all("why" in d and d["why"] for d in decisions)
 
 
 def test_generate_epithet_security_work():
@@ -369,17 +400,35 @@ Create `core/entries.py`:
 
 ```python
 import re
-from core.constants import EPITHET_KEYWORDS
+from core.constants import EPITHET_KEYWORDS, ENTRY_TYPE_DECISION, ENTRY_TYPE_OBSERVATION
 
 
 def parse_day_entries(content: str) -> list[dict]:
     entries = []
-    pattern = r"### \[ref:(\d+)\] (.+?)(?:\n([\s\S]*?))?(?=\n### |\n## |\Z)"
+    pattern = r"### \[ref:(\d+)\] (?:\[(\w+)\] )?(.+?)(?:\n([\s\S]*?))?(?=\n### |\n## |\Z)"
     for match in re.finditer(pattern, content):
+        entry_type = match.group(2) or ENTRY_TYPE_OBSERVATION
+        raw_body = match.group(4).strip() if match.group(4) else ""
+
+        # Extract Why: and What: fields from body (for decisions)
+        why = ""
+        body = raw_body
+        if entry_type == ENTRY_TYPE_DECISION:
+            why_match = re.search(r"^Why:\s*(.+?)(?=^What:|\Z)", raw_body, re.MULTILINE | re.DOTALL)
+            what_match = re.search(r"^What:\s*(.+?)$", raw_body, re.MULTILINE | re.DOTALL)
+            if why_match:
+                why = why_match.group(1).strip()
+            if what_match:
+                body = what_match.group(1).strip()
+            elif not why_match:
+                body = raw_body  # No Why/What structure, keep as body
+
         entries.append({
             "ref": int(match.group(1)),
-            "title": match.group(2).strip(),
-            "body": match.group(3).strip() if match.group(3) else "",
+            "type": entry_type,
+            "title": match.group(3).strip(),
+            "why": why,
+            "body": body,
         })
     return entries
 
@@ -402,8 +451,13 @@ def serialize_day_entries(
         "",
     ]
     for entry in entries:
-        lines.append(f"### [ref:{entry['ref']}] {entry['title']}")
-        if entry.get("body"):
+        entry_type = entry.get("type", ENTRY_TYPE_OBSERVATION)
+        lines.append(f"### [ref:{entry['ref']}] [{entry_type}] {entry['title']}")
+        if entry_type == ENTRY_TYPE_DECISION and entry.get("why"):
+            lines.append(f"Why: {entry['why']}")
+            if entry.get("body"):
+                lines.append(f"What: {entry['body']}")
+        elif entry.get("body"):
             lines.append(entry["body"])
         lines.append("")
     return "\n".join(lines)
@@ -423,29 +477,46 @@ def parse_dusk_entries(content: str) -> list[dict]:
         elif "Layer 3" in line:
             current_layer = 3
         elif current_layer > 0:
-            # Layer 1: ### [ref:N] title + body
-            h3_match = re.match(r"### \[ref:(\d+)\] (.+)", line)
+            # Layer 1: ### [ref:N] [type] title + Why/What body
+            h3_match = re.match(r"### \[ref:(\d+)\] (?:\[(\w+)\] )?(.+)", line)
             if h3_match:
+                entry_type = h3_match.group(2) or ENTRY_TYPE_OBSERVATION
                 body_lines = []
+                why = ""
                 i += 1
                 while i < len(lines) and not lines[i].startswith("#") and not lines[i].startswith("- [ref:"):
-                    if lines[i].strip():
-                        body_lines.append(lines[i].strip())
+                    stripped = lines[i].strip()
+                    if stripped.startswith("Why:"):
+                        why = stripped[4:].strip()
+                    elif stripped:
+                        body_lines.append(stripped)
                     i += 1
                 entries.append({
                     "layer": current_layer,
                     "ref": int(h3_match.group(1)),
-                    "title": h3_match.group(2).strip(),
+                    "type": entry_type,
+                    "title": h3_match.group(3).strip(),
+                    "why": why,
                     "body": " ".join(body_lines),
                 })
                 continue
-            # Layer 2/3: - [ref:N] text
-            li_match = re.match(r"- \[ref:(\d+)\] (.+)", line)
+            # Layer 2/3: - [ref:N] [type] text (decisions preserve Why inline)
+            li_match = re.match(r"- \[ref:(\d+)\] (?:\[(\w+)\] )?(.+)", line)
             if li_match:
+                entry_type = li_match.group(2) or ENTRY_TYPE_OBSERVATION
+                text = li_match.group(3).strip()
+                why = ""
+                # Decisions in layer 2/3 have inline Why: "title — Why: reason"
+                why_inline = re.search(r"— Why: (.+)", text)
+                if why_inline:
+                    why = why_inline.group(1).strip()
+                    text = text[:why_inline.start()].strip()
                 entries.append({
                     "layer": current_layer,
                     "ref": int(li_match.group(1)),
-                    "title": li_match.group(2).strip(),
+                    "type": entry_type,
+                    "title": text,
+                    "why": why,
                     "body": "",
                 })
         i += 1
@@ -463,13 +534,20 @@ def serialize_dusk_entries(entries: list[dict], name: str, epithet: str | None) 
         if layer_entries:
             lines.append(f"## {label}")
             for entry in layer_entries:
+                entry_type = entry.get("type", ENTRY_TYPE_OBSERVATION)
                 if layer_num == 1:
-                    lines.append(f"### [ref:{entry['ref']}] {entry['title']}")
+                    lines.append(f"### [ref:{entry['ref']}] [{entry_type}] {entry['title']}")
+                    if entry.get("why"):
+                        lines.append(f"Why: {entry['why']}")
                     if entry.get("body"):
                         lines.append(entry["body"])
                     lines.append("")
                 else:
-                    lines.append(f"- [ref:{entry['ref']}] {entry['title']}")
+                    # Decisions in layer 2/3 preserve Why inline
+                    if entry_type == ENTRY_TYPE_DECISION and entry.get("why"):
+                        lines.append(f"- [ref:{entry['ref']}] [{entry_type}] {entry['title']} — Why: {entry['why']}")
+                    else:
+                        lines.append(f"- [ref:{entry['ref']}] [{entry_type}] {entry['title']}")
             lines.append("")
     return "\n".join(lines)
 
