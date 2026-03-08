@@ -1,0 +1,20 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "empire",
+  "description": "Continuous Context Protocol — generational intelligence through dynasty succession",
+  "owner": {
+    "name": "jansimner"
+  },
+  "plugins": [
+    {
+      "name": "empire",
+      "description": "Continuous Context Protocol — manage conversation context through dynasty succession (Dawn/Day/Dusk). Auto-generates entries, consults past decisions, rotates context automatically.",
+      "version": "0.1.0",
+      "author": {
+        "name": "jansimner"
+      },
+      "source": "./plugins/empire",
+      "category": "productivity"
+    }
+  ]
+}
