@@ -19,6 +19,7 @@ from core.state import (
 from core.entries import parse_day_entries, serialize_day_entries
 from core.briefing import generate_briefing
 from core.ref_tracker import load_ref_cache
+from core.scribe import get_session_diff, extract_changed_files, classify_changes, merge_with_existing
 
 
 def apply_ref_cache(entries: list[dict], cache: dict) -> list[dict]:
@@ -50,6 +51,15 @@ def main():
         if cache:
             entries = apply_ref_cache(entries, cache)
             write_file_safe(cache_path, "{}")
+
+        # Auto-generate entries from git diff
+        diff_output = get_session_diff()
+        if diff_output:
+            changed_files = extract_changed_files(diff_output)
+            if changed_files:
+                new_entries = classify_changes(diff_output, changed_files)
+                if new_entries:
+                    entries = merge_with_existing(new_entries, entries)
 
         dynasty = read_dynasty_json(dynasty_dir)
         current = dynasty.get("current", 1)
