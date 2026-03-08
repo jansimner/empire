@@ -130,84 +130,15 @@ Write commented-out defaults showing all thresholds:
 
 ## Step 4: Create Dynasty Working State
 
-Use the Python core modules to compute paths. Run a Python script inline:
+Run the founding script to create private dynasty files. This is a single command — do not skip it:
 
-```python
-import sys
-sys.path.insert(0, "<project_root>")
-from core.paths import get_dynasty_dir, sanitize_branch_name
-from core.state import ensure_dynasty_dir, write_dynasty_json
-from datetime import datetime, timezone
-
-branch = "<detected_branch>"
-dynasty_dir = get_dynasty_dir(branch)
-ensure_dynasty_dir(dynasty_dir)
-
-# Write dynasty.json
-data = {
-    "current": 1,
-    "branch": branch,
-    "founded": datetime.now(timezone.utc).isoformat(),
-    "last_succession": None,
-    "sessions_since_succession": 0,
-    "epithets": {}
-}
-write_dynasty_json(dynasty_dir, data)
-print(dynasty_dir)
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/hooks/found_dynasty.py
 ```
 
-### 4a: Create `day.md`
+This creates `dynasty.json`, `day.md`, `dawn.md`, `dusk.md`, and `day-briefing.md` in the private dynasty directory (`~/.claude/projects/<project>/empire/dynasty/<branch>/`). The script auto-detects the branch and git state. It is idempotent — safe to run multiple times.
 
-In the dynasty directory, create `day.md` with the Claude I header:
-
-```markdown
-# ☀️ Day — Claude I
-<!-- Branch: <branch> | Born: <ISO timestamp> -->
-
-## Entries
-
-```
-
-### 4b: Create `dawn.md`
-
-In the dynasty directory, create `dawn.md` seeded from git state. Gather:
-- Current branch name
-- Last 5-10 recent commit messages (`git log --oneline -10`)
-- Whether there are uncommitted changes (`git status --porcelain`)
-- Any stashed changes (`git stash list`)
-
-Format as:
-
-```markdown
-# 🌅 Dawn — Claude II
-<!-- Staged for next succession -->
-
-## Git State
-- Branch: <branch>
-- Recent commits:
-  - <hash> <message>
-  - <hash> <message>
-  - ...
-- Uncommitted changes: <yes/no with summary>
-- Stashes: <count or "none">
-
-## Dusk Wisdom
-<!-- Populated during succession from keyword-matched Dusk entries -->
-```
-
-### 4c: Create empty `dusk.md`
-
-```markdown
-# 🌙 Dusk
-<!-- No wisdom yet — first succession will populate -->
-```
-
-### 4d: Create empty `day-briefing.md`
-
-```markdown
-# Day Briefing — Claude I
-<!-- Auto-generated at end of session. No entries yet. -->
-```
+**You MUST run this command before proceeding to Step 5.** Verify it prints "Dynasty state created at:" before continuing.
 
 ## Step 5: Print Founding Ceremony
 
