@@ -142,24 +142,23 @@ This creates `dynasty.json`, `day.md`, `dawn.md`, `dusk.md`, and `day-briefing.m
 
 ## Step 5: Print Founding Ceremony
 
-Display the founding ceremony using box-drawing characters and emojis exactly in this format:
+Display the founding ceremony. Print this text exactly (replace `<branch>` and `<vault_source>`):
 
 ```
-┌─────────────────────────────────────────────────┐
-│  👑 DYNASTY FOUNDED                              │
-│  🌿 Branch: <branch>                            │
-├─────────────────────────────────────────────────┤
-│  ☀️  Claude I                → born as Day        │
-│  🌅 Claude II               → born as Dawn       │
-├─────────────────────────────────────────────────┤
-│  🏛️  Vault: auto-detected from project files     │
-│  📜 Protocol: written to .empire/protocol.md     │
-├─────────────────────────────────────────────────┤
-│  👑 Long live Claude I. May they earn their name.│
-└─────────────────────────────────────────────────┘
+DYNASTY FOUNDED
+===============
+Branch: <branch>
+
+  Claude I   -> born as Day
+  Claude II  -> born as Dawn
+
+  Vault: <vault_source>
+  Protocol: written to .empire/protocol.md
+
+Long live Claude I. May they earn their name.
 ```
 
-Replace `<branch>` with the actual branch name. If vault was auto-detected from a manifest file, keep "auto-detected from project files". If no manifest was found, say "initialized with project defaults".
+For `<vault_source>`: if vault was auto-detected from a manifest file, use "auto-detected from project files". If no manifest was found, use "initialized with project defaults".
 
 ## Step 6: Stage and Commit
 

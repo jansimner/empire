@@ -20,6 +20,7 @@ from core.entries import parse_day_entries, serialize_day_entries
 from core.briefing import generate_briefing
 from core.ref_tracker import load_ref_cache
 from core.scribe import get_session_diff, extract_changed_files, classify_changes, merge_with_existing
+from core.constants import ruler_name
 
 
 def apply_ref_cache(entries: list[dict], cache: dict) -> list[dict]:
@@ -67,7 +68,7 @@ def main():
         current_epithet = epithets.get(str(current))
         born = dynasty.get("founded", "")
 
-        updated_day = serialize_day_entries(entries, f"Claude {current}", current_epithet, branch, born)
+        updated_day = serialize_day_entries(entries, ruler_name(current), current_epithet, branch, born)
         write_file_safe(day_path, updated_day)
 
         sessions = dynasty.get("sessions_since_succession", 0)
@@ -75,7 +76,7 @@ def main():
 
         briefing = generate_briefing(
             entries=entries,
-            name=f"Claude {current}",
+            name=ruler_name(current),
             epithet=current_epithet,
             branch=branch,
             succession_suggested=should_succeed,

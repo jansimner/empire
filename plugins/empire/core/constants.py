@@ -17,6 +17,19 @@ REF_TIER2_SCORE = 1   # Directory overlap
 REF_TIER3_SCORE = 1   # 2+ keyword matches (single keyword ignored — too noisy)
 REF_TIER3_MIN_KEYWORDS = 2  # Minimum keyword overlaps for tier 3
 
+# Roman numerals for ruler names
+ROMAN_NUMERALS = {
+    1: "I", 2: "II", 3: "III", 4: "IV", 5: "V",
+    6: "VI", 7: "VII", 8: "VIII", 9: "IX", 10: "X",
+    11: "XI", 12: "XII", 13: "XIII", 14: "XIV", 15: "XV",
+    16: "XVI", 17: "XVII", 18: "XVIII", 19: "XIX", 20: "XX",
+}
+
+
+def ruler_name(n: int) -> str:
+    return f"Claude {ROMAN_NUMERALS.get(n, n)}"
+
+
 # Entry types
 ENTRY_TYPE_DECISION = "decision"     # Has sacred Why: field, never compressed
 ENTRY_TYPE_OBSERVATION = "observation"  # Compresses safely through tiers

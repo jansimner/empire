@@ -17,6 +17,7 @@ def parse_day_entries(content: str) -> list[dict]:
             what_match = re.search(r"^What:\s*(.+?)$", raw_body, re.MULTILINE | re.DOTALL)
             if why_match:
                 why = why_match.group(1).strip()
+                body = ""  # Decision with Why: but no What: — body stays empty
             if what_match:
                 body = what_match.group(1).strip()
             elif not why_match:

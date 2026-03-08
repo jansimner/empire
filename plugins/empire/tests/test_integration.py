@@ -89,7 +89,7 @@ def test_session_start_outputs_vault_and_briefing(empire_env):
     # Vault exists, briefing file doesn't yet — should still output vault
     assert "Vault" in output
     assert "TypeScript" in output
-    assert "Claude 1" in output
+    assert "Claude I" in output
 
 
 def test_session_start_with_briefing(empire_env):
@@ -398,7 +398,7 @@ def test_full_lifecycle_end_to_end(empire_env):
         dynasty_dir=empire_env["dynasty_dir"],
         branch=BRANCH,
     )
-    assert "Claude 1" in output
+    assert "Claude I" in output
 
     # 2. Write day entries
     entries = [

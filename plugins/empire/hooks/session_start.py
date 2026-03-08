@@ -11,6 +11,7 @@ sys.path.insert(0, plugin_root)
 from core.paths import get_project_root, get_dynasty_dir, get_current_branch
 from core.state import read_file_safe, read_dynasty_json
 from core.oracle import search_lineage, extract_topic_keywords, format_ancestor_hint
+from core.constants import ruler_name
 
 
 def build_briefing_output(
@@ -32,7 +33,7 @@ def build_briefing_output(
     current_epithet = epithets.get(str(current))
 
     parts = []
-    parts.append(f"Empire active on branch: {branch} | Claude {current}")
+    parts.append(f"Empire active on branch: {branch} | {ruler_name(current)}")
     if current_epithet:
         parts[-1] += f' "{current_epithet}"'
 
