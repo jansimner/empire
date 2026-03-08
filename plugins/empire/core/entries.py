@@ -152,6 +152,17 @@ def serialize_dusk_entries(entries: list[dict], name: str, epithet: str | None) 
     return "\n".join(lines)
 
 
+def validate_entries(entries: list[dict]) -> list[str]:
+    """Validate parsed entries, returning a list of warning strings."""
+    warnings = []
+    for i, entry in enumerate(entries):
+        if not entry.get("title", "").strip():
+            warnings.append(f"Entry at position {i} has no title")
+        if entry.get("type") == ENTRY_TYPE_DECISION and not entry.get("why", "").strip():
+            warnings.append(f"Decision '{entry.get('title', '')}' has no Why: field")
+    return warnings
+
+
 def generate_epithet(entries: list[dict]) -> str:
     if not entries:
         return "the Brief"

@@ -5,6 +5,7 @@ from core.entries import (
     parse_dusk_entries,
     serialize_dusk_entries,
     generate_epithet,
+    validate_entries,
 )
 
 
@@ -122,3 +123,39 @@ def test_generate_epithet_mixed_work():
 def test_generate_epithet_empty():
     epithet = generate_epithet([])
     assert epithet == "the Brief"
+
+
+def test_validate_entries_valid_returns_empty():
+    entries = [
+        {"type": "decision", "title": "Use PostgreSQL", "why": "Better for relational data", "body": ""},
+        {"type": "observation", "title": "Fixed bug", "why": "", "body": "some body"},
+    ]
+    warnings = validate_entries(entries)
+    assert warnings == []
+
+
+def test_validate_entries_decision_missing_why():
+    entries = [
+        {"type": "decision", "title": "Use PostgreSQL", "why": "", "body": "switched to pg"},
+    ]
+    warnings = validate_entries(entries)
+    assert len(warnings) == 1
+    assert "Decision 'Use PostgreSQL' has no Why: field" in warnings[0]
+
+
+def test_validate_entries_empty_title():
+    entries = [
+        {"type": "observation", "title": "", "why": "", "body": "some body"},
+    ]
+    warnings = validate_entries(entries)
+    assert len(warnings) == 1
+    assert "Entry at position 0 has no title" in warnings[0]
+
+
+def test_validate_entries_observation_no_why_is_fine():
+    entries = [
+        {"type": "observation", "title": "Found a bug", "why": "", "body": "details"},
+        {"type": "observation", "title": "Refactored module", "why": "", "body": ""},
+    ]
+    warnings = validate_entries(entries)
+    assert warnings == []

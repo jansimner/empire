@@ -48,7 +48,7 @@ class TestRenderDashboard:
         with (
             patch("core.dashboard.get_project_root", return_value=str(tmp_path)),
             patch("core.dashboard.get_current_branch", return_value="main"),
-            patch("core.dashboard.get_dynasty_dir", return_value=str(dynasty_dir)),
+            patch("core.dashboard.resolve_dynasty_dir", return_value=str(dynasty_dir)),
         ):
             result = render_dashboard()
 
@@ -87,7 +87,7 @@ class TestRenderDashboard:
         with (
             patch("core.dashboard.get_project_root", return_value=str(tmp_path)),
             patch("core.dashboard.get_current_branch", return_value="main"),
-            patch("core.dashboard.get_dynasty_dir", return_value=str(dynasty_dir)),
+            patch("core.dashboard.resolve_dynasty_dir", return_value=str(dynasty_dir)),
         ):
             result = render_dashboard()
 
@@ -109,7 +109,7 @@ class TestRenderDashboard:
         with (
             patch("core.dashboard.get_project_root", return_value=str(tmp_path)),
             patch("core.dashboard.get_current_branch", return_value="main"),
-            patch("core.dashboard.get_dynasty_dir", return_value=str(dynasty_dir)),
+            patch("core.dashboard.resolve_dynasty_dir", return_value=str(dynasty_dir)),
         ):
             result = render_dashboard()
 
@@ -131,7 +131,7 @@ class TestRenderDashboard:
         with (
             patch("core.dashboard.get_project_root", return_value=str(tmp_path)),
             patch("core.dashboard.get_current_branch", return_value="main"),
-            patch("core.dashboard.get_dynasty_dir", return_value=str(dynasty_dir)),
+            patch("core.dashboard.resolve_dynasty_dir", return_value=str(dynasty_dir)),
         ):
             result = render_dashboard()
 
@@ -157,7 +157,7 @@ class TestRenderDashboard:
         with (
             patch("core.dashboard.get_project_root", return_value=str(tmp_path)),
             patch("core.dashboard.get_current_branch", return_value="main"),
-            patch("core.dashboard.get_dynasty_dir", return_value=str(dynasty_dir)),
+            patch("core.dashboard.resolve_dynasty_dir", return_value=str(dynasty_dir)),
         ):
             result = render_dashboard()
 

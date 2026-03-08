@@ -8,8 +8,8 @@ import sys
 plugin_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, plugin_root)
 
-from core.paths import get_project_root, get_dynasty_dir, get_current_branch
-from core.state import read_file_safe, read_dynasty_json
+from core.paths import get_project_root, get_current_branch, resolve_dynasty_dir
+from core.state import read_file_safe, read_dynasty_json, write_dynasty_json
 from core.oracle import search_lineage, extract_topic_keywords, format_ancestor_hint
 from core.constants import ruler_name
 
@@ -69,7 +69,7 @@ def main():
 
         branch = get_current_branch()
         vault_path = os.path.join(project_root, ".empire", "vault.md")
-        dynasty_dir = get_dynasty_dir(branch)
+        dynasty_dir = resolve_dynasty_dir(branch)
         briefing_path = os.path.join(dynasty_dir, "day-briefing.md")
 
         memory_dir = os.path.dirname(dynasty_dir)
@@ -80,6 +80,12 @@ def main():
         )
         if output:
             print(output)
+
+        # Increment session counter at start so it counts even if session crashes
+        dynasty = read_dynasty_json(dynasty_dir)
+        sessions = dynasty.get("sessions_since_succession", 0)
+        dynasty["sessions_since_succession"] = sessions + 1
+        write_dynasty_json(dynasty_dir, dynasty)
     except Exception:
         pass  # Fail silently per design
 

@@ -8,7 +8,7 @@ import sys
 plugin_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, plugin_root)
 
-from core.paths import get_project_root, get_dynasty_dir, get_current_branch
+from core.paths import get_project_root, get_current_branch, resolve_dynasty_dir
 from core.state import read_file_safe
 from core.entries import parse_day_entries
 from core.ref_tracker import score_entries_against_content, load_ref_cache, save_ref_cache
@@ -35,7 +35,7 @@ def main():
             return
 
         branch = get_current_branch()
-        dynasty_dir = get_dynasty_dir(branch)
+        dynasty_dir = resolve_dynasty_dir(branch)
         day_path = os.path.join(dynasty_dir, "day.md")
         day_content = read_file_safe(day_path)
         if not day_content:

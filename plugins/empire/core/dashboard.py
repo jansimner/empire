@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 
 from core.constants import VAULT_MAX_LINES, ruler_name
 from core.entries import parse_day_entries, parse_dusk_entries
-from core.paths import get_current_branch, get_dynasty_dir, get_project_root
+from core.paths import get_current_branch, get_project_root, resolve_dynasty_dir
 from core.state import (
     check_succession_triggers,
     count_lines,
@@ -45,7 +45,7 @@ def render_dashboard() -> str:
         )
 
     branch = get_current_branch()
-    dynasty_dir = get_dynasty_dir(branch)
+    dynasty_dir = resolve_dynasty_dir(branch)
     dynasty = read_dynasty_json(dynasty_dir)
 
     current = dynasty.get("current", 1)

@@ -8,7 +8,7 @@ import sys
 plugin_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, plugin_root)
 
-from core.paths import get_project_root, get_dynasty_dir, get_current_branch
+from core.paths import get_project_root, get_current_branch, resolve_dynasty_dir
 from core.state import (
     read_file_safe,
     write_file_safe,
@@ -16,7 +16,7 @@ from core.state import (
     write_dynasty_json,
     check_succession_triggers,
 )
-from core.entries import parse_day_entries, serialize_day_entries
+from core.entries import parse_day_entries, serialize_day_entries, validate_entries
 from core.briefing import generate_briefing
 from core.ref_tracker import load_ref_cache
 from core.scribe import get_session_diff, extract_changed_files, classify_changes, merge_with_existing
@@ -38,7 +38,7 @@ def main():
             return
 
         branch = get_current_branch()
-        dynasty_dir = get_dynasty_dir(branch)
+        dynasty_dir = resolve_dynasty_dir(branch)
         day_path = os.path.join(dynasty_dir, "day.md")
         day_content = read_file_safe(day_path)
 
@@ -61,6 +61,11 @@ def main():
                 new_entries = classify_changes(diff_output, changed_files)
                 if new_entries:
                     entries = merge_with_existing(new_entries, entries)
+
+        # Validate entries and warn about issues
+        warnings = validate_entries(entries)
+        for w in warnings:
+            print(f"Empire warning: {w}", file=sys.stderr)
 
         dynasty = read_dynasty_json(dynasty_dir)
         current = dynasty.get("current", 1)
@@ -85,7 +90,6 @@ def main():
         briefing_path = os.path.join(dynasty_dir, "day-briefing.md")
         write_file_safe(briefing_path, briefing)
 
-        dynasty["sessions_since_succession"] = sessions + 1
         write_dynasty_json(dynasty_dir, dynasty)
 
         if should_succeed:
