@@ -40,7 +40,7 @@ def test_get_memory_dir_constructs_path(tmp_path):
         with patch("core.paths.get_project_root", return_value="/home/user/myproject"):
             result = get_memory_dir()
             assert "empire" in result
-            assert "home-user-myproject" in result
+            assert "-home-user-myproject" in result
 
 
 def test_get_dynasty_dir_uses_sanitized_branch(tmp_path):

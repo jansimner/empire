@@ -25,8 +25,6 @@ def get_memory_dir() -> str:
     if project_root is None:
         project_root = os.getcwd()
     project_key = project_root.replace("/", "-").replace("\\", "-")
-    if project_key.startswith("-"):
-        project_key = project_key[1:]
     return os.path.join(home, ".claude", "projects", project_key, "empire")
 
 
