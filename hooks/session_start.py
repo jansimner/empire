@@ -10,6 +10,7 @@ sys.path.insert(0, plugin_root)
 
 from core.paths import get_project_root, get_dynasty_dir, get_current_branch
 from core.state import read_file_safe, read_dynasty_json
+from core.oracle import search_lineage, extract_topic_keywords, format_ancestor_hint
 
 
 def build_briefing_output(
@@ -17,6 +18,7 @@ def build_briefing_output(
     briefing_path: str,
     dynasty_dir: str,
     branch: str,
+    lineage_path: str = "",
 ) -> str:
     vault = read_file_safe(vault_path)
     briefing = read_file_safe(briefing_path)
@@ -42,6 +44,19 @@ def build_briefing_output(
         parts.append("")
         parts.append(briefing)
 
+    # Ancestor Oracle: search lineage for topics matching current context
+    if lineage_path:
+        lineage_content = read_file_safe(lineage_path)
+        if lineage_content:
+            keywords = extract_topic_keywords(briefing, "", vault)
+            if keywords:
+                matches = search_lineage(lineage_content, keywords)
+                if matches:
+                    hint = format_ancestor_hint(matches)
+                    if hint:
+                        parts.append("")
+                        parts.append(hint)
+
     return "\n".join(parts)
 
 
@@ -56,7 +71,12 @@ def main():
         dynasty_dir = get_dynasty_dir(branch)
         briefing_path = os.path.join(dynasty_dir, "day-briefing.md")
 
-        output = build_briefing_output(vault_path, briefing_path, dynasty_dir, branch)
+        memory_dir = os.path.dirname(dynasty_dir)
+        lineage_path = os.path.join(memory_dir, "lineage.md")
+
+        output = build_briefing_output(
+            vault_path, briefing_path, dynasty_dir, branch, lineage_path,
+        )
         if output:
             print(output)
     except Exception:
