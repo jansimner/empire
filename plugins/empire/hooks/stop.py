@@ -16,7 +16,7 @@ from core.state import (
     write_dynasty_json,
     check_succession_triggers,
 )
-from core.entries import parse_day_entries, serialize_day_entries, validate_entries
+from core.entries import parse_day_entries, serialize_day_entries, validate_entries, generate_epithet
 from core.briefing import generate_briefing
 from core.ref_tracker import load_ref_cache, apply_ref_cache
 from core.scribe import get_session_diff, extract_changed_files, classify_changes, merge_with_existing
@@ -62,8 +62,12 @@ def main():
         dynasty = read_dynasty_json(dynasty_dir)
         current = dynasty.get("current", 1)
         epithets = dynasty.get("epithets", {})
-        current_epithet = epithets.get(str(current))
         born = dynasty.get("founded", "")
+
+        # Earn the name through work — recalculate epithet each session
+        current_epithet = generate_epithet(entries)
+        epithets[str(current)] = current_epithet
+        dynasty["epithets"] = epithets
 
         updated_day = serialize_day_entries(entries, ruler_name(current), current_epithet, branch, born)
         write_file_safe(day_path, updated_day)
@@ -89,7 +93,7 @@ def main():
             dawn_path = os.path.join(dynasty_dir, "dawn.md")
             dawn = read_file_safe(dawn_path)
             if "succession suggested" not in dawn.lower():
-                dawn += f"\n\n## ⚔️ Succession suggested\nReason: {reason}\nRun /empire succession or it will auto-trigger next session.\n"
+                dawn += f"\n\n## ⚔️ Succession suggested\nReason: {reason}\nWill auto-trigger at next session start, or run /empire succession now.\n"
                 write_file_safe(dawn_path, dawn)
             print(f"Empire: succession suggested — {reason}. Run /empire succession.")
 

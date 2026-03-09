@@ -164,6 +164,11 @@ def validate_entries(entries: list[dict]) -> list[str]:
 
 
 def generate_epithet(entries: list[dict]) -> str:
+    """Generate an epithet based on the work done in Day entries.
+
+    Scans entry titles, bodies, and Why: fields against keyword categories.
+    Returns the epithet with the highest keyword match score.
+    """
     if not entries:
         return "the Brief"
 
@@ -171,7 +176,11 @@ def generate_epithet(entries: list[dict]) -> str:
     for epithet, keywords in EPITHET_KEYWORDS.items():
         score = 0
         for entry in entries:
-            text = (entry.get("title", "") + " " + entry.get("body", "")).lower()
+            text = (
+                entry.get("title", "") + " "
+                + entry.get("body", "") + " "
+                + entry.get("why", "")
+            ).lower()
             for kw in keywords:
                 if kw in text:
                     score += 1

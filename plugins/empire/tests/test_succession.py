@@ -154,20 +154,20 @@ class TestDeviantCheck:
 
 class TestFormatLineage:
     def test_empty(self):
-        assert format_lineage_entries([], 1) == ""
+        assert format_lineage_entries([], 1, branch="main") == ""
 
     def test_observation(self):
         entries = [{"type": "observation", "title": "Old stuff", "ref": 0, "why": "", "body": "details"}]
-        result = format_lineage_entries(entries, 3)
-        assert "[dynasty:3]" in result
+        result = format_lineage_entries(entries, 3, branch="main", epithet="the Builder")
+        assert "Claude III" in result
+        assert '"the Builder"' in result
         assert "Old stuff" in result
-        assert "details" in result
 
     def test_decision_preserves_why(self):
         entries = [{"type": "decision", "title": "Chose X", "ref": 0, "why": "Because reasons", "body": ""}]
-        result = format_lineage_entries(entries, 2)
+        result = format_lineage_entries(entries, 2, branch="main")
         assert "Why: Because reasons" in result
-        assert "[dynasty:2]" in result
+        assert "Claude II" in result
 
 
 # ─── Integration: run_succession ────────────────────────────────────────

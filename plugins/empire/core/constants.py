@@ -37,15 +37,38 @@ ENTRY_TYPE_DECISION = "decision"     # Has sacred Why: field, never compressed
 ENTRY_TYPE_OBSERVATION = "observation"  # Compresses safely through tiers
 
 EPITHET_KEYWORDS = {
-    "the Builder": ["feature", "add", "create", "new", "implement", "build"],
-    "the Gatekeeper": ["auth", "security", "permission", "token", "jwt", "csrf", "cors"],
-    "the Debugger": ["fix", "bug", "debug", "error", "issue", "patch", "resolve"],
-    "the Reformer": ["refactor", "rename", "restructure", "clean", "simplify", "extract"],
-    "the Painter": ["ui", "css", "style", "layout", "component", "design", "theme"],
-    "the Chronicler": ["database", "migration", "schema", "prisma", "sql", "model"],
-    "the Sentinel": ["test", "spec", "assert", "coverage", "vitest", "jest", "playwright"],
-    "the Engineer": ["ci", "cd", "deploy", "docker", "pipeline", "infra", "config"],
-    "the Ambassador": ["api", "endpoint", "route", "controller", "rest", "graphql"],
-    "the Scribe": ["doc", "readme", "comment", "jsdoc", "typedoc"],
-    "the Swift": ["performance", "optimize", "cache", "speed", "lazy", "bundle"],
+    # Creation & features
+    "the Builder": ["feature", "add", "create", "new", "implement", "build", "scaffold"],
+    "the Architect": ["architecture", "structure", "pattern", "design", "module", "layer", "abstraction"],
+    # Quality & safety
+    "the Gatekeeper": ["auth", "security", "permission", "token", "jwt", "csrf", "cors", "encrypt"],
+    "the Sentinel": ["test", "spec", "assert", "coverage", "vitest", "jest", "playwright", "mock"],
+    "the Debugger": ["fix", "bug", "debug", "error", "issue", "patch", "resolve", "crash"],
+    # Code evolution
+    "the Reformer": ["refactor", "rename", "restructure", "clean", "simplify", "extract", "deduplicate"],
+    "the Surgeon": ["delete", "remove", "prune", "trim", "strip", "deprecate", "drop"],
+    # Frontend & design
+    "the Painter": ["ui", "css", "style", "layout", "component", "theme", "animation", "responsive"],
+    "the Cartographer": ["navigation", "routing", "route", "page", "screen", "menu", "breadcrumb"],
+    # Data & persistence
+    "the Chronicler": ["database", "migration", "schema", "prisma", "sql", "model", "seed", "orm"],
+    "the Alchemist": ["transform", "convert", "parse", "serialize", "format", "encode", "decode"],
+    # Infrastructure
+    "the Engineer": ["ci", "cd", "deploy", "docker", "pipeline", "infra", "config", "kubernetes"],
+    "the Warden": ["monitor", "logging", "alert", "metric", "observability", "healthcheck", "sentry"],
+    # API & integration
+    "the Ambassador": ["api", "endpoint", "route", "controller", "rest", "graphql", "webhook", "socket"],
+    "the Courier": ["email", "notification", "message", "queue", "event", "pubsub", "webhook"],
+    # Performance & optimization
+    "the Swift": ["performance", "optimize", "cache", "speed", "lazy", "bundle", "compress", "index"],
+    # Documentation & communication
+    "the Scribe": ["doc", "readme", "comment", "jsdoc", "typedoc", "changelog", "guide"],
+    # Data movement
+    "the Migrator": ["migrate", "migration", "upgrade", "import", "export", "sync", "transfer"],
+    # Accessibility & UX
+    "the Steward": ["accessibility", "a11y", "aria", "wcag", "keyboard", "screenreader", "i18n", "l10n"],
+    # Payments & business logic
+    "the Treasurer": ["payment", "billing", "invoice", "subscription", "price", "stripe", "checkout"],
+    # Search & discovery
+    "the Seeker": ["search", "filter", "sort", "query", "index", "elasticsearch", "algolia", "find"],
 }

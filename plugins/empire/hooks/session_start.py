@@ -20,6 +20,7 @@ from core.briefing import generate_briefing
 from core.ref_tracker import apply_ref_cache, load_ref_cache
 from core.oracle import search_lineage, extract_topic_keywords, format_ancestor_hint
 from core.constants import ruler_name
+from core.succession import run_succession
 
 
 def build_briefing_output(
@@ -129,6 +130,26 @@ def main():
 
         # Recover from any previous crash before reading briefing
         recovered_briefing = recover_from_crash(dynasty_dir, dynasty, branch)
+
+        # Auto-succession: if triggers are met, run succession before briefing
+        day_path = os.path.join(dynasty_dir, "day.md")
+        day_content = read_file_safe(day_path)
+        if day_content:
+            entries = parse_day_entries(day_content)
+            sessions = dynasty.get("sessions_since_succession", 0)
+            should_succeed, reason = check_succession_triggers(entries, sessions)
+            if should_succeed and sessions > 0:
+                report = run_succession(
+                    dynasty_dir=dynasty_dir,
+                    project_root=project_root,
+                    branch=branch,
+                    trigger_reason=f"auto: {reason}",
+                )
+                print(report)
+                print("")
+                # Re-read dynasty after succession
+                dynasty = read_dynasty_json(dynasty_dir)
+                recovered_briefing = None
 
         vault = read_file_safe(vault_path)
         briefing_path = os.path.join(dynasty_dir, "day-briefing.md")

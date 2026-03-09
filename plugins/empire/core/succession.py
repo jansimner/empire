@@ -17,6 +17,8 @@ import subprocess
 from datetime import datetime, timezone
 
 from core.constants import (
+    DEVIANT_NUDGE_SESSIONS,
+    DEVIANT_RESOLVE_SESSIONS,
     DUSK_LAYER1_MAX,
     DUSK_LAYER2_MAX,
     DUSK_LAYER3_MAX,
@@ -41,11 +43,6 @@ from core.state import (
     write_dynasty_json,
     write_file_safe,
 )
-
-
-def _compress_to_oneliner(entry: dict) -> str:
-    """Compress an entry to a one-line title. Uses existing title as-is."""
-    return entry.get("title", "").strip()
 
 
 def _extract_file_paths(text: str) -> set[str]:
@@ -209,10 +206,9 @@ def vault_check(
     vault_lines = count_lines(vault_content)
     updated_dusk = list(dusk_entries)
 
-    # Only entries that have survived 3+ successions are candidates
-    # We approximate this by checking if ref >= 3 (high reference = long-lived)
+    # Entries in layer 2+ with high ref scores are vault candidates
     for i, entry in enumerate(updated_dusk):
-        if entry.get("ref", 0) >= 3 and entry.get("layer", 1) >= 2:
+        if entry.get("ref", 0) >= VAULT_PROMOTION_SESSIONS and entry.get("layer", 1) >= 2:
             if vault_lines < VAULT_MAX_LINES:
                 title = entry.get("title", "")
                 vault_content += f"- {title}\n"
@@ -262,10 +258,10 @@ def deviant_check(
             if match:
                 count = int(match.group(1)) + 1
                 lines[i] = f"Session: {count}"
-                if count >= 10:
-                    lines.insert(i + 1, "🚨 Deviant unresolved for 10+ sessions — consider resolving")
-                elif count >= 5:
-                    lines.insert(i + 1, "⚠️ Deviant unresolved for 5+ sessions")
+                if count >= DEVIANT_RESOLVE_SESSIONS:
+                    lines.insert(i + 1, f"🚨 Deviant unresolved for {DEVIANT_RESOLVE_SESSIONS}+ sessions — consider resolving")
+                elif count >= DEVIANT_NUDGE_SESSIONS:
+                    lines.insert(i + 1, f"⚠️ Deviant unresolved for {DEVIANT_NUDGE_SESSIONS}+ sessions")
         updated = "\n".join(lines)
 
     if new_deviants:
@@ -276,30 +272,47 @@ def deviant_check(
 
 # ─── Step 8: Lineage Format ────────────────────────────────────────────
 
-def format_lineage_entries(entries: list[dict], dynasty_num: int) -> str:
-    """Format demoted entries for append to lineage.md."""
+def format_lineage_entries(
+    entries: list[dict],
+    dynasty_num: int,
+    branch: str,
+    epithet: str | None = None,
+    sessions: int = 0,
+    start_date: str = "",
+) -> str:
+    """Format demoted entries for append to lineage.md.
+
+    Output matches the format that parse_lineage_entries() expects:
+      ## Claude N "epithet" (branch)
+      Ruled: <start> to <end> | Sessions: N
+      - [type] title — Why: reason
+    """
     if not entries:
         return ""
 
-    now = datetime.now(timezone.utc).isoformat()
-    lines = []
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    start = start_date[:10] if start_date else now
+    name = ruler_name(dynasty_num)
+    epithet_str = f' "{epithet}"' if epithet else ""
+
+    lines = [
+        f"\n## {name}{epithet_str} ({branch})",
+        f"Ruled: {start} to {now} | Sessions: {sessions}",
+        "",
+        "### Retired Entries",
+    ]
 
     for entry in entries:
         etype = entry.get("type", ENTRY_TYPE_OBSERVATION)
         title = entry.get("title", "")
-        ref = entry.get("ref", 0)
         why = entry.get("why", "")
-        body = entry.get("body", "")
 
-        lines.append(f"\n### [dynasty:{dynasty_num}] [{etype}] {title}")
-        lines.append(f"Demoted: {now}")
-        lines.append(f"Original ref: {ref}")
         if why:
-            lines.append(f"Why: {why}")
-        if body:
-            lines.append(body)
-        lines.append("")
+            lines.append(f"- [{etype}] {title} — Why: {why}")
+        else:
+            lines.append(f"- [{etype}] {title}")
 
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -396,7 +409,14 @@ def run_succession(
     write_file_safe(os.path.join(dynasty_dir, "dawn.md"), new_dawn_content)
 
     # Append lineage
-    lineage_addition = format_lineage_entries(all_demoted, current)
+    lineage_addition = format_lineage_entries(
+        all_demoted,
+        dynasty_num=current,
+        branch=branch,
+        epithet=epithet,
+        sessions=dynasty.get("sessions_since_succession", 0),
+        start_date=dynasty.get("founded", ""),
+    )
     if lineage_addition:
         if not lineage_content:
             lineage_content = f"# 📜 Lineage\n\n## Dynasty of Claude — {branch}\n"
