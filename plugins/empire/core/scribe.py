@@ -23,18 +23,30 @@ _CONFIG_NAMES = {
 _CI_PATTERNS = {".github/workflows/", ".gitlab-ci", "jenkinsfile", ".circleci/"}
 
 
-def get_session_diff() -> str:
+def get_session_diff(session_start_sha: str = "") -> str:
     """Get git diff for the current session.
 
-    Runs: git diff HEAD (unstaged) + git diff --cached (staged) + git log --oneline -5
+    If *session_start_sha* is provided, diffs from that commit to the current
+    working tree (captures both committed and uncommitted changes made during
+    the session).  Falls back to ``git diff HEAD`` + ``git diff --cached`` when
+    no start SHA is available.
+
     Returns combined output, truncated to 3000 chars to stay lean.
     """
     parts = []
-    commands = [
-        ["git", "diff", "HEAD"],
-        ["git", "diff", "--cached"],
-        ["git", "log", "--oneline", "-5"],
-    ]
+
+    if session_start_sha:
+        # Diff from session start to working tree — captures everything
+        commands = [
+            ["git", "diff", session_start_sha],
+        ]
+    else:
+        # Fallback: only sees uncommitted changes
+        commands = [
+            ["git", "diff", "HEAD"],
+            ["git", "diff", "--cached"],
+        ]
+
     for cmd in commands:
         try:
             result = subprocess.run(

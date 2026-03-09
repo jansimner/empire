@@ -2,6 +2,7 @@
 """SessionStart hook: Load Vault + Day briefing into conversation context."""
 
 import os
+import subprocess
 import sys
 
 plugin_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -168,6 +169,17 @@ def main():
         output = build_briefing_output(vault, briefing, dynasty, branch, lineage_path)
         if output:
             print(output)
+
+        # Record HEAD SHA so the stop hook can diff against it
+        try:
+            head_result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                capture_output=True, text=True, timeout=5,
+            )
+            if head_result.returncode == 0 and head_result.stdout.strip():
+                dynasty["session_start_sha"] = head_result.stdout.strip()
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
 
         # Increment session counter at start so it counts even if session crashes
         sessions = dynasty.get("sessions_since_succession", 0)

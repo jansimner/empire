@@ -38,6 +38,7 @@ def main():
             return
 
         entries = parse_day_entries(day_content)
+        dynasty = read_dynasty_json(dynasty_dir)
 
         cache_path = os.path.join(dynasty_dir, "ref_cache.json")
         cache = load_ref_cache(cache_path)
@@ -45,8 +46,9 @@ def main():
             entries = apply_ref_cache(entries, cache)
             write_file_safe(cache_path, "{}")
 
-        # Auto-generate entries from git diff
-        diff_output = get_session_diff()
+        # Auto-generate entries from git diff (use session start SHA if available)
+        session_start_sha = dynasty.get("session_start_sha", "")
+        diff_output = get_session_diff(session_start_sha)
         if diff_output:
             changed_files = extract_changed_files(diff_output)
             if changed_files:
@@ -58,8 +60,6 @@ def main():
         warnings = validate_entries(entries)
         for w in warnings:
             print(f"Empire warning: {w}", file=sys.stderr)
-
-        dynasty = read_dynasty_json(dynasty_dir)
         current = dynasty.get("current", 1)
         epithets = dynasty.get("epithets", {})
         born = dynasty.get("founded", "")
@@ -97,8 +97,8 @@ def main():
                 write_file_safe(dawn_path, dawn)
             print(f"Empire: succession suggested — {reason}. Run /empire succession.")
 
-    except Exception:
-        pass
+    except Exception as exc:
+        print(f"Empire stop: {exc}", file=sys.stderr)
 
 
 if __name__ == "__main__":
