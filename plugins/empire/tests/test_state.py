@@ -74,6 +74,15 @@ def test_succession_triggers_too_many_sessions():
 def test_succession_triggers_stale_entries():
     entries = [{"ref": 0, "title": f"stale {i}"} for i in range(8)]
     entries += [{"ref": 3, "title": "active 1"}, {"ref": 5, "title": "active 2"}]
-    should, reason = check_succession_triggers(entries=entries, sessions_since_last=1)
+    # Stale ratio requires >= 3 sessions to prevent false triggers on fresh entries
+    should, reason = check_succession_triggers(entries=entries, sessions_since_last=3)
     assert should is True
     assert "stale" in reason.lower()
+
+
+def test_succession_triggers_stale_not_triggered_when_young():
+    """Stale ratio should not trigger with < 3 sessions — entries need time to be referenced."""
+    entries = [{"ref": 0, "title": f"stale {i}"} for i in range(8)]
+    entries += [{"ref": 3, "title": "active 1"}, {"ref": 5, "title": "active 2"}]
+    should, reason = check_succession_triggers(entries=entries, sessions_since_last=1)
+    assert should is False

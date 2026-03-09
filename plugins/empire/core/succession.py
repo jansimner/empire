@@ -114,8 +114,9 @@ def day_to_dusk(day_entries: list[dict]) -> tuple[list[dict], list[dict]]:
         ref = entry.get("ref", 0)
         entry_type = entry.get("type", ENTRY_TYPE_OBSERVATION)
 
-        if ref == 0:
-            # Demote to lineage
+        if ref == 0 and entry_type != ENTRY_TYPE_DECISION:
+            # Demote observations with ref=0 to lineage.
+            # Decisions always survive — their Why: field is sacred.
             demoted.append(dict(entry))
             continue
 

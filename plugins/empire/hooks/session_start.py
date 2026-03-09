@@ -132,6 +132,7 @@ def main():
         recovered_briefing = recover_from_crash(dynasty_dir, dynasty, branch)
 
         # Auto-succession: if triggers are met, run succession before briefing
+        auto_succeeded = False
         day_path = os.path.join(dynasty_dir, "day.md")
         day_content = read_file_safe(day_path)
         if day_content:
@@ -150,10 +151,16 @@ def main():
                 # Re-read dynasty after succession
                 dynasty = read_dynasty_json(dynasty_dir)
                 recovered_briefing = None
+                auto_succeeded = True
 
         vault = read_file_safe(vault_path)
         briefing_path = os.path.join(dynasty_dir, "day-briefing.md")
-        briefing = recovered_briefing or read_file_safe(briefing_path)
+        # After auto-succession, skip the full briefing — the ceremony report
+        # already covers the relevant state and avoids redundant output.
+        if auto_succeeded:
+            briefing = ""
+        else:
+            briefing = recovered_briefing or read_file_safe(briefing_path)
 
         memory_dir = os.path.dirname(dynasty_dir)
         lineage_path = os.path.join(memory_dir, "lineage.md")

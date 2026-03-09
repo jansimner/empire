@@ -92,11 +92,14 @@ class TestDayToDusk:
         assert dusk[0]["body"] == ""  # What: compressed
         assert dusk[0]["why"] == "Because"  # Why: sacred
 
-    def test_ref0_decision_still_demoted(self):
+    def test_ref0_decision_survives_to_dusk(self):
+        """Decisions always survive to Dusk — their Why: is sacred."""
         entries = [{"ref": 0, "type": "decision", "title": "Dead decision", "body": "x", "why": "reason"}]
         dusk, demoted = day_to_dusk(entries)
-        assert len(demoted) == 1
-        assert demoted[0]["why"] == "reason"  # preserved even in demotion
+        assert len(dusk) == 1
+        assert len(demoted) == 0
+        assert dusk[0]["why"] == "reason"
+        assert dusk[0]["body"] == ""  # What: compressed away for low ref
 
     def test_empty_day(self):
         dusk, demoted = day_to_dusk([])

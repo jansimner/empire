@@ -257,9 +257,9 @@ def test_stop_hook_succession_triggers(empire_env):
     assert should is True
     assert ">30" in reason
 
-    # Too many stale entries (all ref 0)
+    # Too many stale entries (all ref 0) — requires >= 3 sessions
     stale_entries = [{"ref": 0, "type": "observation", "title": f"stale {i}", "body": "", "why": ""} for i in range(10)]
-    should, reason = check_succession_triggers(stale_entries, sessions_since_last=0)
+    should, reason = check_succession_triggers(stale_entries, sessions_since_last=3)
     assert should is True
     assert "stale" in reason.lower()
 

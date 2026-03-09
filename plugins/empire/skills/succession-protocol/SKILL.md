@@ -160,7 +160,7 @@ If a layer exceeds its limit after compression, the lowest-ref entries are demot
 
 | Type | Ref >= 3 | Ref 1-2 | Ref 0 |
 |------|----------|---------|-------|
-| `[decision]` | Layer 1: `Why:` verbatim, `What:` detailed | Layer 1: `Why:` verbatim, `What:` one-liner | Demote to lineage (`Why:` preserved) |
+| `[decision]` | Layer 1: `Why:` verbatim, `What:` detailed | Layer 1: `Why:` verbatim, `What:` one-liner | Layer 1: `Why:` verbatim, `What:` compressed (decisions always survive) |
 | `[observation]` | Layer 1: detailed description | Layer 1: one-liner | Demote to lineage |
 
 #### Epithet generation

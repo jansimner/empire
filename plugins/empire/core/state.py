@@ -69,9 +69,12 @@ def check_succession_triggers(
         return True, f"{sessions_since_last} sessions since last succession"
 
     # Trigger 3: Too many stale entries
-    stale = [e for e in entries if e.get("ref", 0) == 0]
-    stale_ratio = len(stale) / len(entries)
-    if stale_ratio >= STALE_RATIO_THRESHOLD:
-        return True, f"{int(stale_ratio * 100)}% of entries are stale ({len(stale)}/{len(entries)})"
+    # Guard: require at least 3 sessions so newly inherited entries have
+    # time to accumulate references before being considered stale.
+    if sessions_since_last >= 3:
+        stale = [e for e in entries if e.get("ref", 0) == 0]
+        stale_ratio = len(stale) / len(entries)
+        if stale_ratio >= STALE_RATIO_THRESHOLD:
+            return True, f"{int(stale_ratio * 100)}% of entries are stale ({len(stale)}/{len(entries)})"
 
     return False, None
