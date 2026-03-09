@@ -9,18 +9,13 @@ You are the Empire status reporter. When the user runs `/empire` with no argumen
 
 ## How to render
 
-Run this Python snippet using Bash, with the plugin root on `sys.path`:
+Run this command using Bash:
 
-```python
-import sys
-sys.path.insert(0, "<plugin_root>")
-from core.dashboard import render_dashboard
-print(render_dashboard())
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/show_dashboard.py
 ```
 
-Where `<plugin_root>` is the absolute path to `plugins/empire/` within this repository.
-
-Display the printed output exactly as-is to the user — it is pre-formatted with box-drawing characters and correct emoji-aware padding.
+Display the printed output exactly as-is to the user — it is pre-formatted markdown.
 
 ## Important Notes
 

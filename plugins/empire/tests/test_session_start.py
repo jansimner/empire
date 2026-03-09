@@ -3,27 +3,27 @@ import os
 import pytest
 from unittest.mock import patch
 from hooks.session_start import build_briefing_output, main
-from core.state import read_dynasty_json
+from core.state import read_dynasty_json, read_file_safe
+from core.paths import reset_project_root_cache
+
+
+@pytest.fixture(autouse=True)
+def _reset_cache():
+    reset_project_root_cache()
+    yield
+    reset_project_root_cache()
 
 
 def test_build_briefing_with_vault_and_briefing(tmp_path):
-    vault_path = tmp_path / "vault.md"
-    vault_path.write_text("# 🏛️ Vault\n- TypeScript + NestJS\n- Prisma ORM")
+    vault = "# 🏛️ Vault\n- TypeScript + NestJS\n- Prisma ORM"
+    briefing = "# ☀️ Briefing\nWorking on auth. Pressure: 30%"
 
-    briefing_path = tmp_path / "day-briefing.md"
-    briefing_path.write_text("# ☀️ Briefing\nWorking on auth. Pressure: 30%")
-
-    dynasty_dir = tmp_path / "dynasty"
-    dynasty_dir.mkdir()
-    (dynasty_dir / "dynasty.json").write_text(json.dumps({
-        "current": 3, "branch": "main",
-        "epithets": {"2": "the Builder", "3": None},
-    }))
+    dynasty = {"current": 3, "branch": "main", "epithets": {"2": "the Builder", "3": None}}
 
     output = build_briefing_output(
-        vault_path=str(vault_path),
-        briefing_path=str(briefing_path),
-        dynasty_dir=str(dynasty_dir),
+        vault=vault,
+        briefing=briefing,
+        dynasty=dynasty,
         branch="main",
     )
     assert "Vault" in output
@@ -34,9 +34,9 @@ def test_build_briefing_with_vault_and_briefing(tmp_path):
 
 def test_build_briefing_no_empire_initialized():
     output = build_briefing_output(
-        vault_path="/nonexistent/vault.md",
-        briefing_path="/nonexistent/briefing.md",
-        dynasty_dir="/nonexistent/dynasty",
+        vault="",
+        briefing="",
+        dynasty={"current": 1, "epithets": {}},
         branch="main",
     )
     assert output == ""

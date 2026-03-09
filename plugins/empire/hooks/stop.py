@@ -18,17 +18,9 @@ from core.state import (
 )
 from core.entries import parse_day_entries, serialize_day_entries, validate_entries
 from core.briefing import generate_briefing
-from core.ref_tracker import load_ref_cache
+from core.ref_tracker import load_ref_cache, apply_ref_cache
 from core.scribe import get_session_diff, extract_changed_files, classify_changes, merge_with_existing
 from core.constants import ruler_name
-
-
-def apply_ref_cache(entries: list[dict], cache: dict) -> list[dict]:
-    for key, count in cache.items():
-        idx = int(key)
-        if 0 <= idx < len(entries):
-            entries[idx]["ref"] = entries[idx].get("ref", 0) + count
-    return entries
 
 
 def main():
@@ -76,6 +68,7 @@ def main():
         updated_day = serialize_day_entries(entries, ruler_name(current), current_epithet, branch, born)
         write_file_safe(day_path, updated_day)
 
+        # sessions_since_succession is incremented in session_start.py, not here
         sessions = dynasty.get("sessions_since_succession", 0)
         should_succeed, reason = check_succession_triggers(entries, sessions)
 

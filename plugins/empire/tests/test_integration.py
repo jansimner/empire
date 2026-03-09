@@ -5,7 +5,8 @@ import os
 import pytest
 
 from hooks.session_start import build_briefing_output
-from hooks.stop import apply_ref_cache
+from core.ref_tracker import apply_ref_cache
+from core.paths import reset_project_root_cache
 from core.entries import (
     parse_day_entries,
     serialize_day_entries,
@@ -24,6 +25,13 @@ from core.state import (
     ensure_dynasty_dir,
 )
 from core.paths import sanitize_branch_name, get_dynasty_dir
+
+
+@pytest.fixture(autouse=True)
+def _reset_cache():
+    reset_project_root_cache()
+    yield
+    reset_project_root_cache()
 
 
 BRANCH = "main"
@@ -80,10 +88,12 @@ def empire_env(tmp_path):
 
 def test_session_start_outputs_vault_and_briefing(empire_env):
     """SessionStart: build_briefing_output includes vault content."""
+    vault = read_file_safe(empire_env["vault_path"])
+    dynasty = read_dynasty_json(empire_env["dynasty_dir"])
     output = build_briefing_output(
-        vault_path=empire_env["vault_path"],
-        briefing_path=empire_env["briefing_path"],
-        dynasty_dir=empire_env["dynasty_dir"],
+        vault=vault,
+        briefing="",
+        dynasty=dynasty,
         branch=BRANCH,
     )
     # Vault exists, briefing file doesn't yet — should still output vault
@@ -94,14 +104,13 @@ def test_session_start_outputs_vault_and_briefing(empire_env):
 
 def test_session_start_with_briefing(empire_env):
     """SessionStart: includes briefing when both vault and briefing exist."""
-    write_file_safe(
-        empire_env["briefing_path"],
-        "# Briefing\nActive work: auth system\n2 Day entries.",
-    )
+    vault = read_file_safe(empire_env["vault_path"])
+    briefing = "# Briefing\nActive work: auth system\n2 Day entries."
+    dynasty = read_dynasty_json(empire_env["dynasty_dir"])
     output = build_briefing_output(
-        vault_path=empire_env["vault_path"],
-        briefing_path=empire_env["briefing_path"],
-        dynasty_dir=empire_env["dynasty_dir"],
+        vault=vault,
+        briefing=briefing,
+        dynasty=dynasty,
         branch=BRANCH,
     )
     assert "Vault" in output
@@ -392,10 +401,12 @@ def test_epithet_generation_themed_work(empire_env):
 def test_full_lifecycle_end_to_end(empire_env):
     """End-to-end: init -> write entries -> score refs -> apply cache -> briefing -> succession check."""
     # 1. Verify initial state via session start
+    vault = read_file_safe(empire_env["vault_path"])
+    dynasty = read_dynasty_json(empire_env["dynasty_dir"])
     output = build_briefing_output(
-        vault_path=empire_env["vault_path"],
-        briefing_path=empire_env["briefing_path"],
-        dynasty_dir=empire_env["dynasty_dir"],
+        vault=vault,
+        briefing="",
+        dynasty=dynasty,
         branch=BRANCH,
     )
     assert "Claude I" in output
@@ -455,10 +466,13 @@ def test_full_lifecycle_end_to_end(empire_env):
     write_dynasty_json(empire_env["dynasty_dir"], dynasty)
 
     # 7. Next session start should see the briefing
+    vault2 = read_file_safe(empire_env["vault_path"])
+    briefing2 = read_file_safe(empire_env["briefing_path"])
+    dynasty2 = read_dynasty_json(empire_env["dynasty_dir"])
     output2 = build_briefing_output(
-        vault_path=empire_env["vault_path"],
-        briefing_path=empire_env["briefing_path"],
-        dynasty_dir=empire_env["dynasty_dir"],
+        vault=vault2,
+        briefing=briefing2,
+        dynasty=dynasty2,
         branch=BRANCH,
     )
     assert "Briefing" in output2

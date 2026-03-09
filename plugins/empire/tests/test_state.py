@@ -14,7 +14,7 @@ from core.state import (
 
 def test_read_dynasty_json_default(tmp_path):
     result = read_dynasty_json(str(tmp_path / "nonexistent"))
-    assert result["current"] == 0
+    assert result["current"] == 1
     assert result["branch"] == "main"
     assert result["epithets"] == {}
 

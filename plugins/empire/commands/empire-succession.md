@@ -9,27 +9,10 @@ When the user runs `/empire succession`, execute the following steps.
 
 ## Step 1: Check Dynasty Exists
 
-Run a Python script to check for an existing dynasty:
+Run this command using Bash:
 
-```python
-import sys, os
-sys.path.insert(0, "<plugin_root>")
-from core.paths import get_dynasty_dir, get_current_branch, get_project_root
-
-project_root = get_project_root()
-branch = get_current_branch()
-
-if project_root is None or not os.path.isdir(os.path.join(project_root, ".empire")):
-    print("NO_EMPIRE")
-else:
-    dynasty_dir = get_dynasty_dir(branch)
-    dynasty_json_path = os.path.join(dynasty_dir, "dynasty.json")
-    if not os.path.exists(dynasty_json_path):
-        print("NO_DYNASTY")
-    else:
-        print(f"DYNASTY_DIR={dynasty_dir}")
-        print(f"PROJECT_ROOT={project_root}")
-        print(f"BRANCH={branch}")
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/check_dynasty.py
 ```
 
 - If `NO_EMPIRE` → print `No Empire found. Run /empire init first.` and stop.
@@ -37,20 +20,10 @@ else:
 
 ## Step 2: Execute Succession
 
-Run the deterministic succession protocol via Python:
+Run the deterministic succession protocol using the values from Step 1:
 
-```python
-import sys
-sys.path.insert(0, "<plugin_root>")
-from core.succession import run_succession
-
-report = run_succession(
-    dynasty_dir="<dynasty_dir>",
-    project_root="<project_root>",
-    branch="<branch>",
-    trigger_reason="manual trigger",
-)
-print(report)
+```bash
+python3 ${CLAUDE_PLUGIN_ROOT}/scripts/run_succession.py
 ```
 
 Display the report output to the user.

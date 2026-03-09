@@ -7,14 +7,32 @@ def sanitize_branch_name(branch: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_\-.]", "-", branch)
 
 
+_project_root_cache: str | None = None
+_project_root_cached = False
+
+
+def reset_project_root_cache() -> None:
+    """Reset the memoized project root. Used by tests."""
+    global _project_root_cache, _project_root_cached
+    _project_root_cache = None
+    _project_root_cached = False
+
+
 def get_project_root() -> str | None:
+    global _project_root_cache, _project_root_cached
+    if _project_root_cached:
+        return _project_root_cache
     cwd = os.getcwd()
     current = cwd
     while True:
         if os.path.isdir(os.path.join(current, ".empire")):
+            _project_root_cache = current
+            _project_root_cached = True
             return current
         parent = os.path.dirname(current)
         if parent == current:
+            _project_root_cache = None
+            _project_root_cached = True
             return None
         current = parent
 

@@ -67,3 +67,16 @@ def save_ref_cache(cache_path: str, data: dict) -> None:
     os.makedirs(os.path.dirname(cache_path), exist_ok=True)
     with open(cache_path, "w") as f:
         json.dump(data, f)
+
+
+def apply_ref_cache(entries: list[dict], cache: dict) -> list[dict]:
+    """Apply accumulated ref scores from cache to entries."""
+    for key, count in cache.items():
+        try:
+            idx = int(key)
+            count = int(count)
+        except (ValueError, TypeError):
+            continue
+        if 0 <= idx < len(entries):
+            entries[idx]["ref"] = entries[idx].get("ref", 0) + count
+    return entries

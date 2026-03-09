@@ -10,7 +10,15 @@ from core.paths import (
     get_dynasty_dir,
     resolve_dynasty_dir,
     sanitize_branch_name,
+    reset_project_root_cache,
 )
+
+
+@pytest.fixture(autouse=True)
+def _reset_cache():
+    reset_project_root_cache()
+    yield
+    reset_project_root_cache()
 
 
 def test_sanitize_branch_name_simple():

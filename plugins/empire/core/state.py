@@ -1,7 +1,7 @@
 import json
 import os
 from datetime import datetime, timezone
-from core.constants import DAY_ENTRY_LIMIT, SESSIONS_BEFORE_SUCCESSION, STALE_RATIO_THRESHOLD
+from core.constants import DAY_ENTRY_LIMIT, INITIAL_RULER_NUM, SESSIONS_BEFORE_SUCCESSION, STALE_RATIO_THRESHOLD
 
 
 def read_file_safe(path: str) -> str:
@@ -35,7 +35,7 @@ def read_dynasty_json(dynasty_dir: str) -> dict:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
         return {
-            "current": 0,
+            "current": INITIAL_RULER_NUM,
             "branch": "main",
             "founded": datetime.now(timezone.utc).isoformat(),
             "last_succession": None,

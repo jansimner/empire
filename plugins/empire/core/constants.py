@@ -1,3 +1,5 @@
+INITIAL_RULER_NUM = 1  # Default ruler number when dynasty.json is missing/corrupt
+
 VAULT_MAX_LINES = 50
 VAULT_PROMOTION_SESSIONS = 3
 DEVIANT_NUDGE_SESSIONS = 5
