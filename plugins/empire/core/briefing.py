@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+MAX_RECENT_ENTRIES = 10
+
 
 def generate_briefing(
     entries: list[dict],
@@ -15,7 +17,6 @@ def generate_briefing(
         title += f' "{epithet}"'
 
     high_ref = [e for e in entries if e.get("ref", 0) >= 3]
-    active_titles = [e["title"] for e in high_ref[:3]]
 
     lines = [
         f"# ☀️ Briefing — {title}",
@@ -24,10 +25,19 @@ def generate_briefing(
         "",
     ]
 
-    if active_titles:
-        lines.append("Active work: " + "; ".join(active_titles))
-    else:
-        lines.append("No high-reference entries.")
+    # Always show recent entries so the next session knows what happened
+    if entries:
+        recent = entries[-MAX_RECENT_ENTRIES:]
+        lines.append("## Recent work")
+        for entry in recent:
+            tag = entry.get("type", "observation")
+            lines.append(f"- [{tag}] {entry['title']}")
+        if len(entries) > MAX_RECENT_ENTRIES:
+            lines.append(f"  ...and {len(entries) - MAX_RECENT_ENTRIES} earlier entries")
+        lines.append("")
+
+    if high_ref:
+        lines.append("Hot topics: " + "; ".join(e["title"] for e in high_ref[:3]))
 
     lines.append(f"{len(entries)} Day entries, {len(high_ref)} high-reference.")
 

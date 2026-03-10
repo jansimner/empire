@@ -1,5 +1,5 @@
 import pytest
-from core.briefing import generate_briefing
+from core.briefing import generate_briefing, MAX_RECENT_ENTRIES
 from core.entries import parse_day_entries
 
 
@@ -66,3 +66,89 @@ def test_generate_briefing_empty_entries():
     )
     assert "Briefing" in briefing
     assert "0" in briefing
+    assert "Recent work" not in briefing
+
+
+def test_generate_briefing_always_shows_recent_entries():
+    """All entries appear in briefing regardless of ref score."""
+    entries = [
+        {"ref": 0, "type": "observation", "title": "Fixed login bug"},
+        {"ref": 0, "type": "observation", "title": "Updated README"},
+    ]
+    briefing = generate_briefing(
+        entries=entries,
+        name="Claude I",
+        epithet=None,
+        branch="main",
+    )
+    assert "Recent work" in briefing
+    assert "Fixed login bug" in briefing
+    assert "Updated README" in briefing
+
+
+def test_generate_briefing_shows_hot_topics_for_high_ref():
+    """High-ref entries get highlighted separately as hot topics."""
+    entries = [
+        {"ref": 5, "type": "decision", "title": "Chose PostgreSQL"},
+        {"ref": 0, "type": "observation", "title": "Ran migrations"},
+    ]
+    briefing = generate_briefing(
+        entries=entries,
+        name="Claude II",
+        epithet="the Architect",
+        branch="main",
+    )
+    assert "Hot topics" in briefing
+    assert "Chose PostgreSQL" in briefing
+    assert "Ran migrations" in briefing
+
+
+def test_generate_briefing_no_hot_topics_when_all_low_ref():
+    """No hot topics section when nothing has high ref score."""
+    entries = [
+        {"ref": 0, "type": "observation", "title": "Minor fix"},
+    ]
+    briefing = generate_briefing(
+        entries=entries,
+        name="Claude I",
+        epithet=None,
+        branch="main",
+    )
+    assert "Hot topics" not in briefing
+    assert "Minor fix" in briefing
+
+
+def test_generate_briefing_caps_at_max_recent():
+    """Only the most recent MAX_RECENT_ENTRIES entries are shown."""
+    entries = [
+        {"ref": 0, "type": "observation", "title": f"Entry {i}"}
+        for i in range(15)
+    ]
+    briefing = generate_briefing(
+        entries=entries,
+        name="Claude V",
+        epithet=None,
+        branch="main",
+    )
+    # Should show the last MAX_RECENT_ENTRIES entries
+    assert f"Entry {15 - MAX_RECENT_ENTRIES}" in briefing
+    assert "Entry 14" in briefing
+    # First entries should be truncated
+    assert "Entry 0" not in briefing
+    assert "5 earlier entries" in briefing
+
+
+def test_generate_briefing_entry_type_tags():
+    """Entry type tags (observation/decision) appear in the listing."""
+    entries = [
+        {"ref": 0, "type": "decision", "title": "Use TypeScript"},
+        {"ref": 0, "type": "observation", "title": "Added tests"},
+    ]
+    briefing = generate_briefing(
+        entries=entries,
+        name="Claude I",
+        epithet=None,
+        branch="main",
+    )
+    assert "[decision] Use TypeScript" in briefing
+    assert "[observation] Added tests" in briefing
