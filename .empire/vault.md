@@ -7,3 +7,4 @@
 
 ## Architecture
 <!-- Add immortal context here as you learn the codebase -->
+- 8e726ba chore: restructure as marketplace with plugins/empire/ layout

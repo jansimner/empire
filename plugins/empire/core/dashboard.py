@@ -3,7 +3,13 @@
 import os
 from datetime import datetime, timezone
 
-from core.constants import VAULT_MAX_LINES, ruler_name
+from core.constants import (
+    DAY_ENTRY_LIMIT,
+    SESSIONS_BEFORE_SUCCESSION,
+    STALE_RATIO_THRESHOLD,
+    VAULT_MAX_LINES,
+    ruler_name,
+)
 from core.entries import parse_day_entries, parse_dusk_entries
 from core.paths import get_current_branch, get_project_root, resolve_dynasty_dir
 from core.state import (
@@ -73,16 +79,12 @@ def render_dashboard() -> str:
     dev_content = read_file_safe(os.path.join(empire_mem, "deviants.md"))
     unresolved = len([l for l in dev_content.split("\n") if l.strip().startswith("- [ ]")])
 
-    # Pressure
+    # Succession triggers
     triggered, reason = check_succession_triggers(day_entries, sessions)
-    entry_pressure = min(len(day_entries) / 30.0, 1.0) if day_entries else 0.0
-    session_pressure = min(sessions / 5.0, 1.0)
+    n_entries = len(day_entries)
     stale = [e for e in day_entries if e.get("ref", 0) == 0]
-    stale_pressure = (len(stale) / len(day_entries)) if day_entries else 0.0
-    pressure = max(entry_pressure, session_pressure, stale_pressure)
-    pressure_pct = int(pressure * 100)
-    filled = round(pressure * 10)
-    bar = "▓" * filled + "░" * (10 - filled)
+    stale_pct = int(len(stale) / n_entries * 100) if n_entries else 0
+    stale_threshold_pct = int(STALE_RATIO_THRESHOLD * 100)
 
     # Epithets
     day_epithet = epithets.get(str(current))
@@ -103,39 +105,68 @@ def render_dashboard() -> str:
             return f'{name} "{epithet}"'
         return name
 
+    # Entry summaries for Day ruler
+    entry_summaries = []
+    for e in day_entries:
+        title = e.get("title", "").strip()
+        if title:
+            entry_summaries.append(title)
+
+    # Stale trigger display
+    if sessions < 3:
+        stale_line = f"Stale: {stale_pct}% (inactive until session 3)"
+    else:
+        stale_line = f"Stale: {stale_pct}%/{stale_threshold_pct}%"
+
+    if triggered:
+        succession_status = f"**Due** — {reason} (last: {last_str})"
+    else:
+        succession_status = f"Not due (last: {last_str})"
+
     # Build output
     lines = [
-        f"# Empire — {branch}",
+        f"# \u269C Empire — {branch}",
         "",
-        "## Dynasty",
+        "---",
         "",
     ]
 
-    # Dawn
-    lines.append(f"- **Dawn:** {dawn_name} — {dawn_staged} staged")
-
-    # Day
+    # Day (current ruler — prominent)
     day_display = fmt_epithet(day_name, day_epithet)
-    lines.append(f"- **Day:** {day_display} — {len(day_entries)} entries")
+    lines.append(f"\U0001F451 **{day_display}** — {len(day_entries)} entries")
+    if entry_summaries:
+        for s in entry_summaries:
+            lines.append(f"  \u25B8 {s}")
 
-    # Dusk
+    lines.append("")
+
+    # Dawn & Dusk
+    lines.append(f"\U0001F305 Dawn: {dawn_name} ({dawn_staged} staged)")
     if dusk_num >= 1:
         dusk_name = ruler_name(dusk_num)
         dusk_display = fmt_epithet(dusk_name, dusk_epithet)
-        lines.append(f"- **Dusk:** {dusk_display} — {len(dusk_entries)} wisdom")
+        lines.append(f"\U0001F307 Dusk: {dusk_display} ({len(dusk_entries)} wisdom)")
     else:
-        lines.append("- **Dusk:** none")
+        lines.append("\U0001F307 Dusk: none")
 
     lines.append("")
-    lines.append("## State")
+    lines.append("---")
     lines.append("")
-    lines.append(f"- **Vault:** {vault_used}/{VAULT_MAX_LINES} lines")
-    lines.append(f"- **Deviants:** {unresolved} unresolved")
-    lines.append(f"- **Pressure:** {bar} {pressure_pct}%")
-    lines.append(f"- **Last succession:** {last_str}")
 
-    if triggered and reason:
-        lines.append("")
-        lines.append(f"**Succession suggested:** {reason}")
+    # State (compact single-line)
+    lines.append(
+        f"\U0001F4DC Vault: {vault_used}/{VAULT_MAX_LINES} lines"
+        f" \u00B7 \u26A0 Deviants: {unresolved} unresolved"
+    )
+
+    lines.append("")
+    lines.append("---")
+    lines.append("")
+
+    # Succession — explicit triggers
+    lines.append(f"\u2696 **Succession** — {succession_status}")
+    lines.append(f"  \u25CB Entries: {n_entries}/{DAY_ENTRY_LIMIT}")
+    lines.append(f"  \u25CB Sessions: {sessions}/{SESSIONS_BEFORE_SUCCESSION}")
+    lines.append(f"  \u25CB {stale_line}")
 
     return "\n".join(lines)

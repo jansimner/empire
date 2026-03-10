@@ -52,13 +52,13 @@ class TestRenderDashboard:
         ):
             result = render_dashboard()
 
-        assert "# Empire — main" in result
-        assert "**Dawn:**" in result
-        assert "**Day:** Claude I" in result
-        assert "**Dusk:** none" in result
-        assert "**Vault:** 0/50 lines" in result
-        assert "**Pressure:**" in result
-        assert "**Last succession:** never" in result
+        assert "Empire — main" in result
+        assert "Dawn: Claude II" in result
+        assert "**Claude I**" in result
+        assert "Dusk: none" in result
+        assert "Vault: 0/50 lines" in result
+        assert "**Succession**" in result
+        assert "Not due (last: never)" in result
 
     def test_with_entries_and_epithet(self, tmp_path, monkeypatch):
         dynasty_dir = self._setup_empire(
@@ -91,10 +91,12 @@ class TestRenderDashboard:
         ):
             result = render_dashboard()
 
-        assert "Claude III" in result
+        assert "**Claude III**" in result
         assert "2 entries" in result
+        assert "Added auth" in result
+        assert "Tested deploy" in result
         assert "3 staged" in result
-        assert '**Dusk:** Claude II "the Builder"' in result
+        assert 'Dusk: Claude II "the Builder"' in result
         assert "1 wisdom" in result
 
     def test_first_dynasty_no_dusk(self, tmp_path, monkeypatch):
@@ -113,9 +115,9 @@ class TestRenderDashboard:
         ):
             result = render_dashboard()
 
-        assert "**Dusk:** none" in result
+        assert "Dusk: none" in result
 
-    def test_succession_warning(self, tmp_path, monkeypatch):
+    def test_succession_due(self, tmp_path, monkeypatch):
         dynasty_dir = self._setup_empire(
             tmp_path,
             {
@@ -135,16 +137,17 @@ class TestRenderDashboard:
         ):
             result = render_dashboard()
 
-        assert "**Succession suggested:**" in result
+        assert "**Due**" in result
+        assert "Sessions: 6/5" in result
 
-    def test_pressure_bar(self, tmp_path, monkeypatch):
+    def test_succession_not_due(self, tmp_path, monkeypatch):
         dynasty_dir = self._setup_empire(
             tmp_path,
             {
                 "current": 1, "branch": "main",
                 "founded": "2026-01-01T00:00:00Z",
                 "last_succession": None,
-                "sessions_since_succession": 0,
+                "sessions_since_succession": 1,
                 "epithets": {},
             },
             day_md=(
@@ -161,5 +164,34 @@ class TestRenderDashboard:
         ):
             result = render_dashboard()
 
-        assert "▓▓▓▓▓▓▓▓▓▓" in result
-        assert "100%" in result
+        assert "Not due" in result
+        assert "Stale: 100% (inactive until session 3)" in result
+        assert "Entries: 2/30" in result
+
+    def test_entry_summaries_shown(self, tmp_path, monkeypatch):
+        dynasty_dir = self._setup_empire(
+            tmp_path,
+            {
+                "current": 1, "branch": "main",
+                "founded": "2026-01-01T00:00:00Z",
+                "last_succession": None,
+                "sessions_since_succession": 0,
+                "epithets": {},
+            },
+            day_md=(
+                "# Day\n## Entries\n\n"
+                "### [ref:2] [decision] Chose REST over GraphQL\n"
+                "Why: Simpler.\nWhat: REST endpoints.\n\n"
+                "### [ref:0] [observation] Fixed auth bug\nBody.\n"
+            ),
+        )
+        monkeypatch.chdir(tmp_path)
+        with (
+            patch("core.dashboard.get_project_root", return_value=str(tmp_path)),
+            patch("core.dashboard.get_current_branch", return_value="main"),
+            patch("core.dashboard.resolve_dynasty_dir", return_value=str(dynasty_dir)),
+        ):
+            result = render_dashboard()
+
+        assert "Chose REST over GraphQL" in result
+        assert "Fixed auth bug" in result
